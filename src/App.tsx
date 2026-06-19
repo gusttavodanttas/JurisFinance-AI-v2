@@ -49,6 +49,7 @@ import { INITIAL_PRIORITY_BILLS } from "./mockData";
 import { PriorityBill } from "./types";
 import { getFirestoreUser, createFirestoreUser, getAllFirestoreUsers, FirestoreUser } from "./lib/usersDb";
 import CloudUsersTab from "./components/CloudUsersTab";
+import { getUserFinancials, saveUserFinancials } from "./lib/financeDb";
 
 
 
@@ -434,6 +435,7 @@ export default function App() {
   };
   const handleLogout = () => {
     sessionStorage.removeItem("gd_auth");
+    sessionStorage.removeItem("gd_auth_email");
     setIsAuthenticated(false);
   };
 
@@ -481,6 +483,81 @@ export default function App() {
       month: "2026-06"
     })) : [];
   });
+
+  const [isLoadingCloud, setIsLoadingCloud] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<"synced" | "syncing" | "error" | "offline">("synced");
+
+  // Fetch financials from Firestore on mount or login
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const email = sessionStorage.getItem("gd_auth_email");
+    if (!email) return;
+
+    const fetchCloudData = async () => {
+      setIsLoadingCloud(true);
+      setSyncStatus("syncing");
+      try {
+        const cloudData = await getUserFinancials(email);
+        if (cloudData) {
+          setTransactions(cloudData.transactions || []);
+          setPriorityBills(cloudData.priorityBills || []);
+          setSyncStatus("synced");
+        } else {
+          // If no cloud data exists (e.g. new user), migrate current local storage data
+          const localTx = transactions;
+          const localBills = priorityBills;
+          if (localTx.length > 0 || localBills.length > 0) {
+            await saveUserFinancials(email, {
+              transactions: localTx,
+              priorityBills: localBills
+            });
+          }
+          setSyncStatus("synced");
+        }
+      } catch (error) {
+        console.error("Erro ao buscar dados do Firestore:", error);
+        setSyncStatus("error");
+      } finally {
+        setIsLoadingCloud(false);
+      }
+    };
+
+    fetchCloudData();
+  }, [isAuthenticated]);
+
+  // Sync mutations to Firestore (debounced by 1s)
+  useEffect(() => {
+    if (isLoadingCloud) return;
+    const email = sessionStorage.getItem("gd_auth_email");
+    if (!email || !isAuthenticated) return;
+
+    const handler = setTimeout(async () => {
+      setSyncStatus("syncing");
+      const success = await saveUserFinancials(email, {
+        transactions,
+        priorityBills
+      });
+      if (success) {
+        setSyncStatus("synced");
+      } else {
+        setSyncStatus("error");
+      }
+    }, 1000);
+
+    return () => clearTimeout(handler);
+  }, [transactions, priorityBills, isAuthenticated, isLoadingCloud]);
+
+  // Detect internet connection changes for status indicator
+  useEffect(() => {
+    const handleOnline = () => setSyncStatus("synced");
+    const handleOffline = () => setSyncStatus("offline");
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   const [selectedMonth, setSelectedMonth] = useState<string>("2026-06"); // Defaults to June 2026
 
@@ -977,6 +1054,32 @@ export default function App() {
                 <span className="text-[8px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-100 hidden sm:inline-block font-extrabold tracking-wider uppercase select-none">
                   Ambiente Seguro
                 </span>
+                
+                {/* Sync status badge */}
+                {syncStatus === "syncing" && (
+                  <span className="text-[8px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full border border-blue-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
+                    Nuvem: Sincronizando
+                  </span>
+                )}
+                {syncStatus === "synced" && (
+                  <span className="text-[8px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Nuvem: Sincronizado
+                  </span>
+                )}
+                {syncStatus === "error" && (
+                  <span className="text-[8px] font-mono bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded-full border border-rose-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none animate-bounce" title="Erro ao salvar alterações no banco de dados Firestore.">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                    Erro na Nuvem
+                  </span>
+                )}
+                {syncStatus === "offline" && (
+                  <span className="text-[8px] font-mono bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full border border-amber-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Modo Offline
+                  </span>
+                )}
               </div>
             </div>
 
@@ -1073,7 +1176,13 @@ export default function App() {
         </header>
 
         {/* DETAILED WORKSPACE VIEW AREA */}
-        <main className="flex-grow p-4 lg:p-6 space-y-6">
+        <main className="flex-grow p-4 lg:p-6 space-y-6 relative">
+          {isLoadingCloud && (
+            <div className="absolute inset-0 bg-slate-50/70 backdrop-blur-xs z-50 flex flex-col items-center justify-center space-y-3 py-20 rounded-xl">
+              <div className="w-10 h-10 border-4 border-violet-500/35 border-t-violet-600 rounded-full animate-spin"></div>
+              <p className="text-xs font-semibold text-slate-500 animate-pulse font-sans">Sincronizando com o Banco de Dados em Nuvem...</p>
+            </div>
+          )}
         
         {/* VIEW 1: PANEL / CONTROLLER VIEW */}
         {activeTab === "dashboard" && (
