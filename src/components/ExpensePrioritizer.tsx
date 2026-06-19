@@ -103,45 +103,113 @@ export default function ExpensePrioritizer({
       const trimmedParts = parts.map(p => p.trim()).filter(Boolean);
       if (trimmedParts.length === 0) continue;
 
-      const description = trimmedParts[0] || "Despesa Lançada";
-      const rawAmount = trimmedParts[1] || "0";
+      let description = "Despesa Lançada";
       let amountNum = 0;
-      if (rawAmount) {
-        let cleanAmount = rawAmount.replace(/R\$/gi, "").replace(/\s/g, "");
-        if (cleanAmount.includes(".") && cleanAmount.includes(",")) {
-          cleanAmount = cleanAmount.replace(/\./g, "").replace(/,/g, ".");
-        } else if (cleanAmount.includes(",")) {
-          cleanAmount = cleanAmount.replace(/,/g, ".");
-        }
-        const parsedAmount = parseFloat(cleanAmount);
-        if (!isNaN(parsedAmount)) {
-          amountNum = parsedAmount;
-        }
-      }
-
-      const rawGroup = trimmedParts[2] || "G1";
       let groupType: "G1" | "G2" | "G3" | "WAIT" = "G1";
       let status: "PAGAR" | "ESPERAR" = "PAGAR";
-
-      const upperGroup = rawGroup.toUpperCase();
-      if (upperGroup === "G2" || upperGroup.includes("IMPORTANTE") || upperGroup.includes("SECUNDAR") || upperGroup.includes("SOFTWARE") || upperGroup.includes("SISTEMA")) {
-        groupType = "G2";
-        status = "PAGAR";
-      } else if (upperGroup === "G3" || upperGroup.includes("FISCAL") || upperGroup.includes("IMPOSTO") || upperGroup.includes("TAXA") || upperGroup.includes("CONTORN")) {
-        groupType = "G3";
-        status = "PAGAR";
-      } else if (upperGroup === "WAIT" || upperGroup.includes("ESPERAR") || upperGroup.includes("AGUARDAR") || upperGroup.includes("RETID") || upperGroup.includes("RETER")) {
-        groupType = "WAIT";
-        status = "ESPERAR";
-      } else {
-        groupType = "G1";
-        status = "PAGAR";
-      }
-
-      const rawScope = trimmedParts[3] || "PJ";
       let scopeSelected = TransactionScope.PROFESSIONAL;
-      if (rawScope.toUpperCase() === "PF" || rawScope.toUpperCase().includes("PESSOAL") || rawScope.toUpperCase() === "PF" || rawScope.toUpperCase() === "PERSONAL") {
-        scopeSelected = TransactionScope.PERSONAL;
+
+      if (parts.length >= 2) {
+        // Delimited format: [description, amount, group, scope]
+        description = trimmedParts[0] || "Despesa Lançada";
+        const rawAmount = trimmedParts[1] || "0";
+        if (rawAmount) {
+          let cleanAmount = rawAmount.replace(/R\$/gi, "").replace(/\s/g, "");
+          if (cleanAmount.includes(".") && cleanAmount.includes(",")) {
+            cleanAmount = cleanAmount.replace(/\./g, "").replace(/,/g, ".");
+          } else if (cleanAmount.includes(",")) {
+            cleanAmount = cleanAmount.replace(/,/g, ".");
+          }
+          const parsedAmount = parseFloat(cleanAmount);
+          if (!isNaN(parsedAmount)) {
+            amountNum = parsedAmount;
+          }
+        }
+
+        const rawGroup = trimmedParts[2] || "G1";
+        const upperGroup = rawGroup.toUpperCase();
+        if (upperGroup === "G2" || upperGroup.includes("IMPORTANTE") || upperGroup.includes("SECUNDAR") || upperGroup.includes("SOFTWARE") || upperGroup.includes("SISTEMA")) {
+          groupType = "G2";
+          status = "PAGAR";
+        } else if (upperGroup === "G3" || upperGroup.includes("FISCAL") || upperGroup.includes("IMPOSTO") || upperGroup.includes("TAXA") || upperGroup.includes("CONTORN")) {
+          groupType = "G3";
+          status = "PAGAR";
+        } else if (upperGroup === "WAIT" || upperGroup.includes("ESPERAR") || upperGroup.includes("AGUARDAR") || upperGroup.includes("RETID") || upperGroup.includes("RETER")) {
+          groupType = "WAIT";
+          status = "ESPERAR";
+        } else {
+          groupType = "G1";
+          status = "PAGAR";
+        }
+
+        const rawScope = trimmedParts[3] || "PJ";
+        if (rawScope.toUpperCase() === "PF" || rawScope.toUpperCase().includes("PESSOAL") || rawScope.toUpperCase() === "PERSONAL") {
+          scopeSelected = TransactionScope.PERSONAL;
+        }
+      } else {
+        // Plain text format: e.g. "Aluguel da sala R$ 1.500,00" or "Energia Light 350.00"
+        // Try to match BRL currency format first: R$ X.XXX,XX or XXX,XX
+        const brlRegex = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})|(?:R\$\s*)?(\d+,\d{2})/i;
+        let match = line.match(brlRegex);
+        
+        // If not found, try decimal/dot format: e.g. 1500.00 or 150.00
+        if (!match) {
+          const decimalRegex = /(?:R\$\s*)?(\d+\.\d{2})/i;
+          match = line.match(decimalRegex);
+        }
+
+        // If not found, try simple numbers (e.g. 1500 or 150)
+        if (!match) {
+          const plainRegex = /(?:R\$\s*)?(\d+)/i;
+          match = line.match(plainRegex);
+        }
+
+        if (match) {
+          const matchedText = match[0];
+          const rawAmount = match[1] || match[2] || matchedText;
+          let cleanAmount = rawAmount.replace(/R\$/gi, "").replace(/\s/g, "");
+          if (cleanAmount.includes(".") && cleanAmount.includes(",")) {
+            cleanAmount = cleanAmount.replace(/\./g, "").replace(/,/g, ".");
+          } else if (cleanAmount.includes(",")) {
+            cleanAmount = cleanAmount.replace(/,/g, ".");
+          }
+          const parsedAmount = parseFloat(cleanAmount);
+          if (!isNaN(parsedAmount)) {
+            amountNum = parsedAmount;
+          }
+
+          // Clean description by removing the matched amount and clean formatting symbols
+          let cleanDesc = line.replace(matchedText, "").trim();
+          cleanDesc = cleanDesc
+            .replace(/^[-\s,;:|]+|[-\s,;:|]+$/g, "") // remove leading/trailing delimiters
+            .replace(/\s*R\$\s*/gi, "") // remove stray R$ symbols
+            .trim();
+          
+          description = cleanDesc || "Despesa Lançada";
+        } else {
+          description = line.trim();
+          amountNum = 0;
+        }
+
+        // Auto-detect group and scope based on keywords in description
+        const upperLine = line.toUpperCase();
+        if (upperLine.includes("G2") || upperLine.includes("IMPORTANTE") || upperLine.includes("SOFTWARE") || upperLine.includes("SISTEMA") || upperLine.includes("ASSINATURA")) {
+          groupType = "G2";
+          status = "PAGAR";
+        } else if (upperLine.includes("G3") || upperLine.includes("IMPOSTO") || upperLine.includes("DAS") || upperLine.includes("TAXA") || upperLine.includes("CONTORN")) {
+          groupType = "G3";
+          status = "PAGAR";
+        } else if (upperLine.includes("WAIT") || upperLine.includes("ESPERAR") || upperLine.includes("AGUARDAR") || upperLine.includes("RETID") || upperLine.includes("POSTERG")) {
+          groupType = "WAIT";
+          status = "ESPERAR";
+        } else {
+          groupType = "G1";
+          status = "PAGAR";
+        }
+
+        if (upperLine.includes("PF") || upperLine.includes("PESSOAL") || upperLine.includes("PERSONAL") || upperLine.includes("CASA") || upperLine.includes("DOMEST")) {
+          scopeSelected = TransactionScope.PERSONAL;
+        }
       }
 
       parsed.push({
