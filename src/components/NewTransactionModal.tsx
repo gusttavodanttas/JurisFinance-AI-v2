@@ -82,6 +82,17 @@ export default function NewTransactionModal({
 
   const isEditMode = !!initialTransaction;
 
+  const [categoriesVersion, setCategoriesVersion] = useState(0);
+  useEffect(() => {
+    const handleUpdate = () => {
+      setCategoriesVersion(prev => prev + 1);
+    };
+    window.addEventListener("categories_updated", handleUpdate);
+    return () => {
+      window.removeEventListener("categories_updated", handleUpdate);
+    };
+  }, []);
+
   // Single category sync
   const matchedCategoriesList = ALL_CATEGORIES_MAP[`${scope}_${type}`] || [];
 
@@ -96,7 +107,7 @@ export default function NewTransactionModal({
     } else {
       setCategory("");
     }
-  }, [scope, type, initialTransaction, matchedCategoriesList]);
+  }, [scope, type, initialTransaction, matchedCategoriesList, categoriesVersion]);
 
   // Handle open modal/editing states
   useEffect(() => {

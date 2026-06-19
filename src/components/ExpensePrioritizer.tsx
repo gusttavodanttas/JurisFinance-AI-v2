@@ -1,5 +1,16 @@
-import React, { useState } from "react";
-import { PriorityBill, TransactionScope, TransactionType } from "../types";
+import React, { useState, useEffect } from "react";
+import { 
+  PriorityBill, 
+  TransactionScope, 
+  TransactionType, 
+  addCustomCategory, 
+  deleteCustomCategory, 
+  ALL_CATEGORIES_MAP,
+  PROFESSIONAL_REVENUE_CATEGORIES,
+  PROFESSIONAL_EXPENSE_CATEGORIES,
+  PERSONAL_REVENUE_CATEGORIES,
+  PERSONAL_EXPENSE_CATEGORIES
+} from "../types";
 import { 
   CheckCircle, 
   Clock, 
@@ -32,6 +43,17 @@ import {
   Sparkles
 } from "lucide-react";
 
+// Increment month string e.g. "2026-06" by X months
+const incrementMonth = (startMonthStr: string, increment: number): string => {
+  const [yearStr, monthStr] = startMonthStr.split("-");
+  const year = parseInt(yearStr);
+  const month = parseInt(monthStr) - 1; // 0-indexed
+  const date = new Date(year, month + increment, 1);
+  const nextYear = date.getFullYear();
+  const nextMonth = String(date.getMonth() + 1).padStart(2, "0");
+  return `${nextYear}-${nextMonth}`;
+};
+
 interface ExpensePrioritizerProps {
   bills: PriorityBill[];
   onUpdateBills: (updated: PriorityBill[]) => void;
@@ -60,8 +82,130 @@ export default function ExpensePrioritizer({
   const [amountVal, setAmountVal] = useState("");
   const [scopeVal, setScopeVal] = useState<TransactionScope>(TransactionScope.PROFESSIONAL);
   const [targetStatus, setTargetStatus] = useState<"PAGAR" | "ESPERAR">("PAGAR");
-  const [targetGroup, setTargetGroup] = useState<"G1" | "G2" | "G3">("G1");
+  const [targetGroup, setTargetGroup] = useState<string>("G1");
   const [filterScope, setFilterScope] = useState<"ALL" | "PROFESSIONAL" | "PERSONAL">("ALL");
+
+  // Recurring & installments options
+  const [billingType, setBillingType] = useState<"unique" | "fixed" | "installment">("unique");
+  const [billingCount, setBillingCount] = useState<string>("12");
+
+  // Settings states
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const gdEmail = sessionStorage.getItem("gd_auth_email") || "default";
+  
+  // Custom groups state
+  const [priorityGroups, setPriorityGroups] = useState<Array<{ id: string; name: string; color: string }>>(() => {
+    const saved = localStorage.getItem(`priority_groups_${gdEmail}`);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return [
+      { id: "G1", name: "Subgrupo 1 • Custos Urgentes", color: "bg-red-500" },
+      { id: "G2", name: "Subgrupo 2 • Acordos e Lazer", color: "bg-orange-500" },
+      { id: "G3", name: "Subgrupo 3 • Assinaturas e Planos", color: "bg-[#8b5cf6]" }
+    ];
+  });
+
+  // Custom Categories list states (to display in customization UI)
+  const [categoriesUpdatedTrigger, setCategoriesUpdatedTrigger] = useState(0);
+  useEffect(() => {
+    const handler = () => setCategoriesUpdatedTrigger(prev => prev + 1);
+    window.addEventListener("categories_updated", handler);
+    return () => window.removeEventListener("categories_updated", handler);
+  }, []);
+
+  // Settings Tab and forms states
+  const [settingsTab, setSettingsTab] = useState<"groups" | "categories">("groups");
+  const [catScope, setCatScope] = useState<TransactionScope>(TransactionScope.PROFESSIONAL);
+  const [catType, setCatType] = useState<TransactionType>(TransactionType.EXPENSE);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState("bg-blue-500");
+
+  const updatePriorityGroups = (updated: Array<{ id: string; name: string; color: string }>) => {
+    setPriorityGroups(updated);
+    localStorage.setItem(`priority_groups_${gdEmail}`, JSON.stringify(updated));
+  };
+
+  const handleRenameGroup = (groupId: string, newName: string) => {
+    const updated = priorityGroups.map(g => g.id === groupId ? { ...g, name: newName } : g);
+    updatePriorityGroups(updated);
+  };
+
+  const handleChangeGroupColor = (groupId: string, newColor: string) => {
+    const updated = priorityGroups.map(g => g.id === groupId ? { ...g, color: newColor } : g);
+    updatePriorityGroups(updated);
+  };
+
+  const handleAddGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGroupName.trim()) return;
+    const newId = "G_" + Math.random().toString(36).substring(2, 9);
+    const newGroup = {
+      id: newId,
+      name: newGroupName.trim(),
+      color: newGroupColor
+    };
+    updatePriorityGroups([...priorityGroups, newGroup]);
+    setNewGroupName("");
+  };
+
+  const handleDeletePriorityGroup = (groupId: string) => {
+    if (priorityGroups.length <= 1) {
+      alert("É necessário manter pelo menos um subgrupo de prioridade.");
+      return;
+    }
+    const remainingGroups = priorityGroups.filter(g => g.id !== groupId);
+    const firstGroupId = remainingGroups[0].id;
+    
+    // Confirm deletion and migration
+    const groupToDelete = priorityGroups.find(g => g.id === groupId);
+    const groupName = groupToDelete ? groupToDelete.name : groupId;
+    
+    if (window.confirm(`Tem certeza que deseja excluir o subgrupo "${groupName}"? Todas as despesas cadastradas nele serão movidas para o subgrupo "${remainingGroups[0].name}".`)) {
+      // Update bills
+      const updatedBills = bills.map(b => {
+        if (b.groupType === groupId) {
+          return { ...b, groupType: firstGroupId };
+        }
+        return b;
+      });
+      onUpdateBills(updatedBills);
+      
+      // Update groups
+      updatePriorityGroups(remainingGroups);
+      
+      // If the currently selected form group was the deleted one, reset it
+      if (targetGroup === groupId) {
+        setTargetGroup(firstGroupId);
+      }
+    }
+  };
+
+  const isDefaultCategory = (scope: TransactionScope, type: TransactionType, categoryName: string): boolean => {
+    if (scope === TransactionScope.PROFESSIONAL) {
+      return type === TransactionType.REVENUE 
+        ? PROFESSIONAL_REVENUE_CATEGORIES.includes(categoryName)
+        : PROFESSIONAL_EXPENSE_CATEGORIES.includes(categoryName);
+    } else {
+      return type === TransactionType.REVENUE 
+        ? PERSONAL_REVENUE_CATEGORIES.includes(categoryName)
+        : PERSONAL_EXPENSE_CATEGORIES.includes(categoryName);
+    }
+  };
+
+  const handleAddCategorySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    addCustomCategory(catScope, catType, newCategoryName.trim());
+    setNewCategoryName("");
+  };
 
   // Bulk paste states for priority bills
   const [isBulkPasteOpen, setIsBulkPasteOpen] = useState(false);
@@ -105,7 +249,7 @@ export default function ExpensePrioritizer({
 
       let description = "Despesa Lançada";
       let amountNum = 0;
-      let groupType: "G1" | "G2" | "G3" | "WAIT" = "G1";
+      let groupType: string = priorityGroups[0]?.id || "G1";
       let status: "PAGAR" | "ESPERAR" = "PAGAR";
       let scopeSelected = TransactionScope.PROFESSIONAL;
 
@@ -126,19 +270,22 @@ export default function ExpensePrioritizer({
           }
         }
 
-        const rawGroup = trimmedParts[2] || "G1";
-        const upperGroup = rawGroup.toUpperCase();
-        if (upperGroup === "G2" || upperGroup.includes("IMPORTANTE") || upperGroup.includes("SECUNDAR") || upperGroup.includes("SOFTWARE") || upperGroup.includes("SISTEMA")) {
-          groupType = "G2";
+        const rawGroup = trimmedParts[2] || "";
+        const matchedGroup = priorityGroups.find(g => g.id.toUpperCase() === rawGroup.toUpperCase() || g.name.toUpperCase().includes(rawGroup.toUpperCase()));
+        if (matchedGroup) {
+          groupType = matchedGroup.id;
           status = "PAGAR";
-        } else if (upperGroup === "G3" || upperGroup.includes("FISCAL") || upperGroup.includes("IMPOSTO") || upperGroup.includes("TAXA") || upperGroup.includes("CONTORN")) {
-          groupType = "G3";
+        } else if (rawGroup.toUpperCase() === "G2" && priorityGroups[1]) {
+          groupType = priorityGroups[1].id;
           status = "PAGAR";
-        } else if (upperGroup === "WAIT" || upperGroup.includes("ESPERAR") || upperGroup.includes("AGUARDAR") || upperGroup.includes("RETID") || upperGroup.includes("RETER")) {
+        } else if (rawGroup.toUpperCase() === "G3" && priorityGroups[2]) {
+          groupType = priorityGroups[2].id;
+          status = "PAGAR";
+        } else if (rawGroup.toUpperCase() === "WAIT" || rawGroup.toUpperCase().includes("ESPERAR") || rawGroup.toUpperCase().includes("AGUARDAR") || rawGroup.toUpperCase().includes("RETID") || rawGroup.toUpperCase().includes("RETER")) {
           groupType = "WAIT";
           status = "ESPERAR";
         } else {
-          groupType = "G1";
+          groupType = priorityGroups[0]?.id || "G1";
           status = "PAGAR";
         }
 
@@ -193,18 +340,24 @@ export default function ExpensePrioritizer({
 
         // Auto-detect group and scope based on keywords in description
         const upperLine = line.toUpperCase();
-        if (upperLine.includes("G2") || upperLine.includes("IMPORTANTE") || upperLine.includes("SOFTWARE") || upperLine.includes("SISTEMA") || upperLine.includes("ASSINATURA")) {
-          groupType = "G2";
-          status = "PAGAR";
-        } else if (upperLine.includes("G3") || upperLine.includes("IMPOSTO") || upperLine.includes("DAS") || upperLine.includes("TAXA") || upperLine.includes("CONTORN")) {
-          groupType = "G3";
-          status = "PAGAR";
-        } else if (upperLine.includes("WAIT") || upperLine.includes("ESPERAR") || upperLine.includes("AGUARDAR") || upperLine.includes("RETID") || upperLine.includes("POSTERG")) {
-          groupType = "WAIT";
-          status = "ESPERAR";
-        } else {
-          groupType = "G1";
-          status = "PAGAR";
+        let matched = false;
+        for (const g of priorityGroups) {
+          const mainPart = g.name.split("•")[1]?.trim() || g.name;
+          if (upperLine.includes(g.id.toUpperCase()) || upperLine.includes(mainPart.toUpperCase())) {
+            groupType = g.id;
+            status = "PAGAR";
+            matched = true;
+            break;
+          }
+        }
+        if (!matched) {
+          if (upperLine.includes("WAIT") || upperLine.includes("ESPERAR") || upperLine.includes("AGUARDAR") || upperLine.includes("RETID") || upperLine.includes("POSTERG")) {
+            groupType = "WAIT";
+            status = "ESPERAR";
+          } else {
+            groupType = priorityGroups[0]?.id || "G1";
+            status = "PAGAR";
+          }
         }
 
         if (upperLine.includes("PF") || upperLine.includes("PESSOAL") || upperLine.includes("PERSONAL") || upperLine.includes("CASA") || upperLine.includes("DOMEST")) {
@@ -294,14 +447,19 @@ export default function ExpensePrioritizer({
       }
 
       const parsed: PriorityBill[] = data.map((item: any) => {
-        let groupType: "G1" | "G2" | "G3" | "WAIT" = "G1";
+        let groupType: string = priorityGroups[0]?.id || "G1";
         const upperGroup = String(item.groupType || "").toUpperCase();
         if (upperGroup === "G2" || upperGroup.includes("G2")) {
-          groupType = "G2";
+          groupType = priorityGroups[1]?.id || "G2";
         } else if (upperGroup === "G3" || upperGroup.includes("G3")) {
-          groupType = "G3";
+          groupType = priorityGroups[2]?.id || "G3";
         } else if (upperGroup === "WAIT" || upperGroup.includes("WAIT") || upperGroup.includes("ESPERAR") || upperGroup.includes("AGUARDAR")) {
           groupType = "WAIT";
+        } else {
+          const matchedG = priorityGroups.find(g => g.id.toUpperCase() === upperGroup);
+          if (matchedG) {
+            groupType = matchedG.id;
+          }
         }
 
         return {
@@ -560,7 +718,7 @@ export default function ExpensePrioritizer({
           ...b,
           status: newStatus,
           // Assign default groupType if moving to PAGAR
-          groupType: newStatus === "PAGAR" ? "G1" as const : "WAIT" as const,
+          groupType: newStatus === "PAGAR" ? (priorityGroups[0]?.id || "G1") : "WAIT",
         };
       }
       return b;
@@ -569,7 +727,7 @@ export default function ExpensePrioritizer({
   };
 
   // Change sub-group for a PAGAR bill
-  const handleChangeGroup = (id: string, group: "G1" | "G2" | "G3") => {
+  const handleChangeGroup = (id: string, group: string) => {
     const updated = bills.map((b) => {
       if (b.id === id) {
         return { ...b, groupType: group };
@@ -603,19 +761,54 @@ export default function ExpensePrioritizer({
     const numVal = parseFloat(amountVal.replace(",", "."));
     if (isNaN(numVal) || numVal <= 0) return;
 
-    const newBill: PriorityBill = {
-      id: "pb-custom-" + Math.random().toString(36).substring(2, 9),
-      description: desc.trim(),
-      amount: numVal,
-      scope: scopeVal,
-      status: targetStatus,
-      groupType: targetStatus === "PAGAR" ? targetGroup : "WAIT",
-      paid: false,
-    };
+    const count = parseInt(billingCount) || 1;
+    const generated: PriorityBill[] = [];
 
-    onUpdateBills([newBill, ...bills]);
+    if (billingType === "unique") {
+      generated.push({
+        id: "pb-custom-" + Math.random().toString(36).substring(2, 9),
+        description: desc.trim(),
+        amount: numVal,
+        scope: scopeVal,
+        status: targetStatus,
+        groupType: targetStatus === "PAGAR" ? targetGroup : "WAIT",
+        paid: false,
+        month: selectedMonth
+      });
+    } else if (billingType === "fixed") {
+      for (let i = 0; i < count; i++) {
+        generated.push({
+          id: "pb-custom-" + Math.random().toString(36).substring(2, 9),
+          description: desc.trim(),
+          amount: numVal,
+          scope: scopeVal,
+          status: targetStatus,
+          groupType: targetStatus === "PAGAR" ? targetGroup : "WAIT",
+          paid: false,
+          month: incrementMonth(selectedMonth, i)
+        });
+      }
+    } else if (billingType === "installment") {
+      for (let i = 0; i < count; i++) {
+        const padIndex = String(i + 1).padStart(2, "0");
+        const padTotal = String(count).padStart(2, "0");
+        generated.push({
+          id: "pb-custom-" + Math.random().toString(36).substring(2, 9),
+          description: `${desc.trim()} (${padIndex}/${padTotal})`,
+          amount: numVal,
+          scope: scopeVal,
+          status: targetStatus,
+          groupType: targetStatus === "PAGAR" ? targetGroup : "WAIT",
+          paid: false,
+          month: incrementMonth(selectedMonth, i)
+        });
+      }
+    }
+
+    onUpdateBills([...generated, ...bills]);
     setDesc("");
     setAmountVal("");
+    setBillingType("unique");
   };
 
   // Direct checkout/payment registration onto main Ledger transactions
@@ -650,15 +843,11 @@ export default function ExpensePrioritizer({
   });
 
   // Calculate sum of groupType functions
-  const getSubgroupTotals = (group: "G1" | "G2" | "G3") => {
+  const getSubgroupTotals = (group: string) => {
     const list = filteredBills.filter((b) => b.status === "PAGAR" && b.groupType === group && !b.paid);
     const sum = list.reduce((acc, curr) => acc + curr.amount, 0);
     return { sum, count: list.length, items: list };
   };
-
-  const g1 = getSubgroupTotals("G1");
-  const g2 = getSubgroupTotals("G2");
-  const g3 = getSubgroupTotals("G3");
 
   const pagarList = filteredBills.filter((b) => b.status === "PAGAR");
   const totalPagar = pagarList.reduce((acc, curr) => acc + (curr.paid ? 0 : curr.amount), 0);
@@ -686,14 +875,24 @@ export default function ExpensePrioritizer({
               Ao alterar o mês na barra superior, as prioridades da legislatura atual são carregadas e persistidas separadamente.
             </p>
           </div>
-          <button
-            onClick={onResetBills}
-            className="flex items-center gap-1 py-1 px-2.5 bg-slate-800 hover:bg-slate-700 transition font-bold text-[10px] uppercase tracking-wider rounded border border-slate-700 text-slate-300 cursor-pointer"
-            title="Restaurar padrão"
-          >
-            <RotateCcw className="w-3 h-3" />
-            Resetar Priorização
-          </button>
+          <div className="flex gap-2 shrink-0">
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="flex items-center gap-1.5 py-1 px-2.5 bg-slate-800 hover:bg-slate-700 transition font-bold text-[10px] uppercase tracking-wider rounded border border-slate-700 text-slate-300 cursor-pointer"
+              title="Personalizar Subgrupos e Categorias"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              Personalizar
+            </button>
+            <button
+              onClick={onResetBills}
+              className="flex items-center gap-1 py-1 px-2.5 bg-slate-800 hover:bg-slate-700 transition font-bold text-[10px] uppercase tracking-wider rounded border border-slate-700 text-slate-300 cursor-pointer"
+              title="Restaurar padrão"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Resetar Priorização
+            </button>
+          </div>
         </div>
       </div>
 
@@ -837,69 +1036,123 @@ export default function ExpensePrioritizer({
         </div>
 
         {/* Quick form insertion of customized priority account */}
-        <form onSubmit={handleAddBill} className="lg:col-span-9 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
-          <div className="md:col-span-2 space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-              Inserir Conta Extra
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Assinatura OAB de julho"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#8b5cf6]"
-            />
+        <form onSubmit={handleAddBill} className="lg:col-span-9 space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div className="md:col-span-4 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                Inserir Conta Extra
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Assinatura OAB de julho"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#8b5cf6] focus:ring-1 focus:ring-[#8b5cf6]"
+              />
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                Valor (R$)
+              </label>
+              <input
+                type="text"
+                placeholder="0,00"
+                value={amountVal}
+                onChange={(e) => setAmountVal(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#8b5cf6] focus:ring-1 focus:ring-[#8b5cf6]"
+              />
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                Escopo
+              </label>
+              <select
+                value={scopeVal}
+                onChange={(e) => setScopeVal(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-[#8b5cf6]"
+              >
+                <option value={TransactionScope.PROFESSIONAL}>Escopo PJ</option>
+                <option value={TransactionScope.PERSONAL}>Escopo PF</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-2 space-y-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                Tipo Lançamento
+              </label>
+              <select
+                value={billingType}
+                onChange={(e) => setBillingType(e.target.value as any)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-[#8b5cf6]"
+              >
+                <option value="unique">Único</option>
+                <option value="fixed">Fixo (Mensal)</option>
+                <option value="installment">Parcelado</option>
+              </select>
+            </div>
+
+            {billingType !== "unique" ? (
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                  {billingType === "fixed" ? "Meses (Repetir)" : "Nº Parcelas"}
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={billingCount}
+                  onChange={(e) => setBillingCount(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-[#8b5cf6] focus:ring-1 focus:ring-[#8b5cf6]"
+                />
+              </div>
+            ) : (
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
+                  Prioridade Inicial
+                </label>
+                <select
+                  value={targetGroup}
+                  onChange={(e) => setTargetGroup(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs text-slate-800 focus:outline-hidden focus:border-[#8b5cf6]"
+                >
+                  {priorityGroups.map(g => (
+                    <option key={g.id} value={g.id}>{g.id} - {g.name.split("•")[1]?.trim() || g.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
 
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-              Valor (R$)
-            </label>
-            <input
-              type="text"
-              placeholder="0,00"
-              value={amountVal}
-              onChange={(e) => setAmountVal(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-hidden focus:border-[#8b5cf6]"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono block">
-              Configurações
-            </label>
-            <select
-              value={scopeVal}
-              onChange={(e) => setScopeVal(e.target.value as any)}
-              className="w-full bg-slate-50 border border-slate-200 rounded p-1.5 text-xs text-slate-800 focus:outline-hidden"
-            >
-              <option value={TransactionScope.PROFESSIONAL}>Escopo PJ</option>
-              <option value={TransactionScope.PERSONAL}>Escopo PF</option>
-            </select>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              className="flex-grow bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider text-xs py-2 rounded transition flex items-center justify-center gap-1 cursor-pointer h-[34px]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Adicionar
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setPastedText("");
-                setParsedPreviewBills([]);
-                setBulkImportError("");
-                setIsBulkPasteOpen(true);
-              }}
-              className="px-2.5 border border-indigo-200 hover:border-indigo-300 text-indigo-700 bg-indigo-50/40 hover:bg-indigo-50 font-bold uppercase tracking-wider text-[11px] py-2 rounded transition flex items-center justify-center gap-1 cursor-pointer h-[34px]"
-              title="Colar lista de despesas em lote"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Colar Lote</span>
-            </button>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pt-1.5">
+            <span className="text-[10px] text-slate-400 font-semibold italic">
+              {billingType === "fixed" && `💡 Irá cadastrar R$ ${amountVal || "0,00"} nos próximos ${billingCount} meses.`}
+              {billingType === "installment" && `💡 Irá cadastrar ${billingCount} parcelas de R$ ${amountVal || "0,00"} nos próximos meses.`}
+            </span>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <button
+                type="submit"
+                className="flex-grow sm:flex-none bg-slate-900 hover:bg-slate-800 text-white font-bold uppercase tracking-wider text-xs px-5 py-2 rounded-lg transition flex items-center justify-center gap-1 cursor-pointer h-[36px] shadow-xs"
+              >
+                <Plus className="w-4 h-4" />
+                Adicionar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPastedText("");
+                  setParsedPreviewBills([]);
+                  setBulkImportError("");
+                  setIsBulkPasteOpen(true);
+                }}
+                className="px-4 border border-indigo-200 hover:border-indigo-300 text-indigo-700 bg-indigo-50/40 hover:bg-indigo-50 font-bold uppercase tracking-wider text-xs py-2 rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer h-[36px]"
+                title="Colar lista de despesas em lote"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-indigo-600" />
+                <span>Colar Lote</span>
+              </button>
+            </div>
           </div>
         </form>
       </div>
@@ -924,411 +1177,158 @@ export default function ExpensePrioritizer({
             </div>
 
             <div className="p-4 space-y-5">
-              {/* SUBGROUP 1: R$ 3.971,09 */}
-              <div className="border border-slate-100 rounded-lg overflow-hidden bg-slate-50/20">
-                <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subgrupo 1 • Custos Urgentes</span>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-slate-700">
-                    {formatCurrency(g1.sum)} ({g1.count} itens)
-                  </span>
-                </div>
+              {priorityGroups.map((group) => {
+                const totals = getSubgroupTotals(group.id);
+                const dotColor = group.color || "bg-slate-400";
                 
-                <div className="divide-y divide-slate-100">
-                  {g1.items.length === 0 ? (
-                    <div className="p-3 text-center text-[11px] text-slate-400">Vazio - Excelente! Sem obrigações urgentes pendentes.</div>
-                  ) : (
-                    g1.items.map(b => (
-                      <div key={b.id} id={`bill-item-${b.id}`} className="transition-all">
-                        {/* DESKTOP ROW */}
-                        <div className="hidden md:flex p-2.5 bg-white items-center justify-between gap-4 text-xs group hover:bg-slate-50/50">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {b.scope === TransactionScope.PROFESSIONAL ? (
-                              <div className="p-1 px-1.5 bg-blue-50 text-[#2563eb] rounded font-mono text-[9px] font-bold shrink-0 border border-blue-200">PJ</div>
-                            ) : (
-                              <div className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold shrink-0 border border-violet-200">PF</div>
-                            )}
-                            <div className="truncate">
-                              <p className="font-bold text-slate-800 leading-tight block">{b.description}</p>
-                              {b.notes && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{b.notes}</p>}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono font-bold text-slate-800 text-right shrink-0">{formatCurrency(b.amount)}</span>
-                            
-                            <button
-                              onClick={() => handleToggleStatus(b.id)}
-                              className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded transition cursor-pointer"
-                              title="Segurar / Postegar para Esperar"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-
-                            <select
-                              value={b.groupType}
-                              onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                              className="bg-transparent text-[10px] text-slate-500 font-bold focus:outline-hidden cursor-pointer"
-                            >
-                              <option value="G1">G1 - Essencial</option>
-                              <option value="G2">G2 - Importante</option>
-                              <option value="G3">G3 - Contornável</option>
-                            </select>
-
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition rounded text-[10px] font-bold uppercase shrink-0 cursor-pointer"
-                            >
-                              Pagar & Lançar
-                            </button>
-
-                            <button onClick={() => handleDeleteBill(b.id)} className="p-1 text-slate-300 hover:text-red-500 rounded transition shrink-0 cursor-pointer">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* MOBILE CARD VIEW */}
-                        <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-slate-50/40 border-b border-slate-100 last:border-b-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {b.scope === TransactionScope.PROFESSIONAL ? (
-                                <span className="p-1 px-1.5 bg-blue-50 text-blue-700 rounded font-mono text-[9px] font-bold border border-blue-200">Escritório PJ</span>
-                              ) : (
-                                <span className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold border border-violet-200">Pessoal PF</span>
-                              )}
-                              
-                              <select
-                                value={b.groupType}
-                                onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                                className="bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-600 font-bold px-1.5 py-0.5 focus:outline-hidden cursor-pointer"
-                              >
-                                <option value="G1">G1 - Essencial</option>
-                                <option value="G2">G2 - Importante</option>
-                                <option value="G3">G3 - Contornável</option>
-                              </select>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleToggleStatus(b.id)}
-                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded transition border border-amber-200 cursor-pointer flex items-center gap-1 text-[9px] font-bold"
-                                title="Segurar / Postegar para Esperar"
-                              >
-                                <span>Segurar</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-
-                              <button 
-                                onClick={() => handleDeleteBill(b.id)} 
-                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded border border-rose-100 transition cursor-pointer"
-                                title="Excluir despesa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-slate-800 text-xs sm:text-sm leading-snug">{b.description}</h4>
-                            {b.notes && (
-                              <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 leading-normal">
-                                {b.notes}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                            <span className="font-mono font-extrabold text-slate-900 text-sm sm:text-base">
-                              {formatCurrency(b.amount)}
-                            </span>
-                            
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-3.5 py-1.5 bg-emerald-600 active:bg-emerald-700 hover:bg-emerald-500 text-white transition rounded-md text-[10px] font-extrabold uppercase tracking-wide cursor-pointer shadow-3xs flex items-center gap-1"
-                            >
-                              Pagar & Lançar
-                            </button>
-                          </div>
-                        </div>
+                return (
+                  <div key={group.id} className="border border-slate-100 rounded-lg overflow-hidden bg-slate-50/20">
+                    <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-1.5 h-1.5 ${dotColor} rounded-full`}></span>
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">{group.name}</span>
                       </div>
-                    ))
-                  )}
-                </div>
-              </div>
+                      <span className="text-xs font-mono font-bold text-slate-700">
+                        {formatCurrency(totals.sum)} ({totals.count} itens)
+                      </span>
+                    </div>
+                    
+                    <div className="divide-y divide-slate-100">
+                      {totals.items.length === 0 ? (
+                        <div className="p-3 text-center text-[11px] text-slate-400">Sem itens cadastrados nesta seção.</div>
+                      ) : (
+                        totals.items.map(b => (
+                          <div key={b.id} id={`bill-item-${b.id}`} className="transition-all">
+                            {/* DESKTOP ROW */}
+                            <div className="hidden md:flex p-2.5 bg-white items-center justify-between gap-4 text-xs group hover:bg-slate-50/50">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {b.scope === TransactionScope.PROFESSIONAL ? (
+                                  <div className="p-1 px-1.5 bg-blue-50 text-[#2563eb] rounded font-mono text-[9px] font-bold shrink-0 border border-blue-200">PJ</div>
+                                ) : (
+                                  <div className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold shrink-0 border border-violet-200">PF</div>
+                                )}
+                                <div className="truncate">
+                                  <span className="font-bold text-slate-800 leading-tight block truncate" title={b.description}>{b.description}</span>
+                                  {b.notes && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{b.notes}</p>}
+                                  {b.category && (
+                                    <span className="inline-block text-[8px] font-extrabold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100/60 mt-1">
+                                      📁 {b.category}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
 
-              {/* SUBGROUP 2: R$ 3.032,00 */}
-              <div className="border border-slate-100 rounded-lg overflow-hidden bg-slate-50/20">
-                <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-orange-500 rounded-full"></span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subgrupo 2 • Acordos e Lazer</span>
+                              <div className="flex items-center gap-3 shrink-0">
+                                <span className="font-mono font-bold text-slate-800 text-right shrink-0">{formatCurrency(b.amount)}</span>
+                                
+                                <button
+                                  onClick={() => handleToggleStatus(b.id)}
+                                  className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded transition cursor-pointer"
+                                  title="Segurar / Postegar para Esperar"
+                                >
+                                  <ArrowRight className="w-3.5 h-3.5" />
+                                </button>
+
+                                <select
+                                  value={b.groupType}
+                                  onChange={(e) => handleChangeGroup(b.id, e.target.value)}
+                                  className="bg-transparent text-[10px] text-slate-500 font-bold focus:outline-hidden cursor-pointer"
+                                >
+                                  {priorityGroups.map(g => (
+                                    <option key={g.id} value={g.id}>{g.id} - {g.name.split("•")[1]?.trim() || g.name}</option>
+                                  ))}
+                                </select>
+
+                                <button
+                                  onClick={() => handlePayAndRegister(b)}
+                                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition rounded text-[10px] font-bold uppercase shrink-0 cursor-pointer"
+                                >
+                                  Pagar & Lançar
+                                </button>
+
+                                <button onClick={() => handleDeleteBill(b.id)} className="p-1 text-slate-300 hover:text-red-500 rounded transition shrink-0 cursor-pointer">
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* MOBILE CARD VIEW */}
+                            <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-slate-50/40 border-b border-slate-100 last:border-b-0">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  {b.scope === TransactionScope.PROFESSIONAL ? (
+                                    <span className="p-1 px-1.5 bg-blue-50 text-blue-700 rounded font-mono text-[9px] font-bold border border-blue-200">Escritório PJ</span>
+                                  ) : (
+                                    <span className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold border border-violet-200">Pessoal PF</span>
+                                  )}
+                                  
+                                  <select
+                                    value={b.groupType}
+                                    onChange={(e) => handleChangeGroup(b.id, e.target.value)}
+                                    className="bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-600 font-bold px-1.5 py-0.5 focus:outline-hidden cursor-pointer"
+                                  >
+                                    {priorityGroups.map(g => (
+                                      <option key={g.id} value={g.id}>{g.id} - {g.name.split("•")[1]?.trim() || g.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => handleToggleStatus(b.id)}
+                                    className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded transition border border-amber-200 cursor-pointer flex items-center gap-1 text-[9px] font-bold"
+                                    title="Segurar / Postegar para Esperar"
+                                  >
+                                    <span>Segurar</span>
+                                    <ArrowRight className="w-3 h-3" />
+                                  </button>
+
+                                  <button 
+                                    onClick={() => handleDeleteBill(b.id)} 
+                                    className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded border border-rose-100 transition cursor-pointer"
+                                    title="Excluir despesa"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1">
+                                <h4 className="font-bold text-slate-800 text-xs sm:text-sm leading-snug">{b.description}</h4>
+                                {b.notes && (
+                                  <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 leading-normal">
+                                    {b.notes}
+                                  </p>
+                                )}
+                                {b.category && (
+                                  <div className="mt-1">
+                                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/60">
+                                      📁 {b.category}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
+                                <span className="font-mono font-extrabold text-slate-900 text-sm sm:text-base">
+                                  {formatCurrency(b.amount)}
+                                </span>
+                                
+                                <button
+                                  onClick={() => handlePayAndRegister(b)}
+                                  className="px-3.5 py-1.5 bg-emerald-600 active:bg-emerald-700 hover:bg-emerald-500 text-white transition rounded-md text-[10px] font-extrabold uppercase tracking-wide cursor-pointer shadow-3xs flex items-center gap-1"
+                                >
+                                  Pagar & Lançar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs font-mono font-bold text-slate-700">
-                    {formatCurrency(g2.sum)} ({g2.count} itens)
-                  </span>
-                </div>
-                
-                <div className="divide-y divide-slate-100">
-                  {g2.items.length === 0 ? (
-                    <div className="p-3 text-center text-[11px] text-slate-400">Sem itens cadastrados nesta seção.</div>
-                  ) : (
-                    g2.items.map(b => (
-                      <div key={b.id} id={`bill-item-${b.id}`} className="transition-all">
-                        {/* DESKTOP ROW */}
-                        <div className="hidden md:flex p-2.5 bg-white items-center justify-between gap-4 text-xs group hover:bg-slate-50/50">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {b.scope === TransactionScope.PROFESSIONAL ? (
-                              <div className="p-1 px-1.5 bg-blue-50 text-[#2563eb] rounded font-mono text-[9px] font-bold shrink-0 border border-blue-200">PJ</div>
-                            ) : (
-                              <div className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold shrink-0 border border-violet-200">PF</div>
-                            )}
-                            <div className="truncate">
-                              <p className="font-bold text-slate-800 leading-tight block">{b.description}</p>
-                              {b.notes && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{b.notes}</p>}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono font-bold text-slate-800 text-right shrink-0">{formatCurrency(b.amount)}</span>
-                            
-                            <button
-                              onClick={() => handleToggleStatus(b.id)}
-                              className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded transition cursor-pointer"
-                              title="Segurar / Postegar para Esperar"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-
-                            <select
-                              value={b.groupType}
-                              onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                              className="bg-transparent text-[10px] text-slate-500 font-bold focus:outline-hidden cursor-pointer"
-                            >
-                              <option value="G1">G1 - Essencial</option>
-                              <option value="G2">G2 - Importante</option>
-                              <option value="G3">G3 - Contornável</option>
-                            </select>
-
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition rounded text-[10px] font-bold uppercase shrink-0 cursor-pointer"
-                            >
-                              Pagar & Lançar
-                            </button>
-
-                            <button onClick={() => handleDeleteBill(b.id)} className="p-1 text-slate-300 hover:text-red-500 rounded transition shrink-0 cursor-pointer">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* MOBILE CARD VIEW */}
-                        <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-slate-50/40 border-b border-slate-100 last:border-b-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {b.scope === TransactionScope.PROFESSIONAL ? (
-                                <span className="p-1 px-1.5 bg-blue-50 text-blue-700 rounded font-mono text-[9px] font-bold border border-blue-200">Escritório PJ</span>
-                              ) : (
-                                <span className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold border border-violet-200">Pessoal PF</span>
-                              )}
-                              
-                              <select
-                                value={b.groupType}
-                                onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                                className="bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-600 font-bold px-1.5 py-0.5 focus:outline-hidden cursor-pointer"
-                              >
-                                <option value="G1">G1 - Essencial</option>
-                                <option value="G2">G2 - Importante</option>
-                                <option value="G3">G3 - Contornável</option>
-                              </select>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleToggleStatus(b.id)}
-                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded transition border border-amber-200 cursor-pointer flex items-center gap-1 text-[9px] font-bold"
-                                title="Segurar / Postegar para Esperar"
-                              >
-                                <span>Segurar</span>
-                                <ArrowRight className="w-3 h-3" />
-                              </button>
-
-                              <button 
-                                onClick={() => handleDeleteBill(b.id)} 
-                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded border border-rose-100 transition cursor-pointer"
-                                title="Excluir despesa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-slate-800 text-xs sm:text-sm leading-snug">{b.description}</h4>
-                            {b.notes && (
-                              <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 leading-normal">
-                                {b.notes}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                            <span className="font-mono font-extrabold text-slate-900 text-sm sm:text-base">
-                              {formatCurrency(b.amount)}
-                            </span>
-                            
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-3.5 py-1.5 bg-emerald-600 active:bg-emerald-700 hover:bg-emerald-500 text-white transition rounded-md text-[10px] font-extrabold uppercase tracking-wide cursor-pointer shadow-3xs flex items-center gap-1"
-                            >
-                              Pagar & Lançar
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* SUBGROUP 3: R$ 1.516,00 */}
-              <div className="border border-slate-100 rounded-lg overflow-hidden bg-slate-50/20">
-                <div className="bg-slate-50 px-3.5 py-2 border-b border-slate-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-[#8b5cf6] rounded-full"></span>
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Subgrupo 3 • Assinaturas e Planos</span>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-slate-700">
-                    {formatCurrency(g3.sum)} ({g3.count} itens)
-                  </span>
-                </div>
-                
-                <div className="divide-y divide-slate-100">
-                  {g3.items.length === 0 ? (
-                    <div className="p-3 text-center text-[11px] text-slate-400">Nenhum plano mensal localizado aqui.</div>
-                  ) : (
-                    g3.items.map(b => (
-                      <div key={b.id} id={`bill-item-${b.id}`} className="transition-all">
-                        {/* DESKTOP ROW */}
-                        <div className="hidden md:flex p-2.5 bg-white items-center justify-between gap-4 text-xs group hover:bg-slate-50/50">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            {b.scope === TransactionScope.PROFESSIONAL ? (
-                              <div className="p-1 px-1.5 bg-blue-50 text-[#2563eb] rounded font-mono text-[9px] font-bold shrink-0 border border-blue-200">PJ</div>
-                            ) : (
-                              <div className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold shrink-0 border border-violet-200">PF</div>
-                            )}
-                            <div className="truncate">
-                              <p className="font-bold text-slate-800 leading-tight block">{b.description}</p>
-                              {b.notes && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{b.notes}</p>}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3 shrink-0">
-                            <span className="font-mono font-bold text-slate-800 text-right shrink-0">{formatCurrency(b.amount)}</span>
-                            
-                            <button
-                              onClick={() => handleToggleStatus(b.id)}
-                              className="p-1 text-slate-400 hover:text-amber-500 hover:bg-amber-50 rounded transition cursor-pointer"
-                              title="Segurar / Postegar para Esperar"
-                            >
-                              <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-
-                            <select
-                              value={b.groupType}
-                              onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                              className="bg-transparent text-[10px] text-slate-500 font-bold focus:outline-hidden cursor-pointer"
-                            >
-                              <option value="G1">G1 - Essencial</option>
-                              <option value="G2">G2 - Importante</option>
-                              <option value="G3">G3 - Contornável</option>
-                            </select>
-
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition rounded text-[10px] font-bold uppercase shrink-0 cursor-pointer"
-                            >
-                              Pagar & Lançar
-                            </button>
-
-                            <button onClick={() => handleDeleteBill(b.id)} className="p-1 text-slate-300 hover:text-red-500 rounded transition shrink-0 cursor-pointer">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* MOBILE CARD VIEW */}
-                        <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-slate-50/40 border-b border-slate-100 last:border-b-0">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              {b.scope === TransactionScope.PROFESSIONAL ? (
-                                <span className="p-1 px-1.5 bg-blue-50 text-blue-700 rounded font-mono text-[9px] font-bold border border-blue-200">Escritório PJ</span>
-                              ) : (
-                                <span className="p-1 px-1.5 bg-violet-50 text-[#8b5cf6] rounded font-mono text-[9px] font-bold border border-violet-200">Pessoal PF</span>
-                              )}
-                              
-                              <select
-                                value={b.groupType}
-                                onChange={(e) => handleChangeGroup(b.id, e.target.value as any)}
-                                className="bg-slate-50 border border-slate-200 rounded text-[10px] text-slate-600 font-bold px-1.5 py-0.5 focus:outline-hidden cursor-pointer"
-                              >
-                                <option value="G1">G1 - Essencial</option>
-                                <option value="G2">G2 - Importante</option>
-                                <option value="G3">G3 - Contornável</option>
-                              </select>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleToggleStatus(b.id)}
-                                className="p-1.5 bg-amber-50 text-amber-700 hover:bg-amber-100 rounded transition border border-amber-200 cursor-pointer flex items-center gap-1 text-[9px] font-bold"
-                                title="Segurar / Postegar para Esperar"
-                              >
-                                <span>Segurar</span>
-                                <ArrowRight className="w-3" />
-                              </button>
-
-                              <button 
-                                onClick={() => handleDeleteBill(b.id)} 
-                                className="p-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 rounded border border-rose-100 transition cursor-pointer"
-                                title="Excluir despesa"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </div>
-
-                          <div className="space-y-1">
-                            <h4 className="font-bold text-slate-800 text-xs sm:text-sm leading-snug">{b.description}</h4>
-                            {b.notes && (
-                              <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100 leading-normal">
-                                {b.notes}
-                              </p>
-                            )}
-                          </div>
-
-                          <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
-                            <span className="font-mono font-extrabold text-slate-900 text-sm sm:text-base">
-                              {formatCurrency(b.amount)}
-                            </span>
-                            
-                            <button
-                              onClick={() => handlePayAndRegister(b)}
-                              className="px-3.5 py-1.5 bg-emerald-600 active:bg-emerald-700 hover:bg-emerald-500 text-white transition rounded-md text-[10px] font-extrabold uppercase tracking-wide cursor-pointer shadow-3xs flex items-center gap-1"
-                            >
-                              Pagar & Lançar
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
+                );
+              })}
             </div>
           </div>
         </div>
@@ -2041,8 +2041,9 @@ app.post('/api/whatsapp-webhook', async (req, res) => {
                   </div>
                 ) : (
                   <div className="flex-grow border border-slate-200 rounded-xl overflow-hidden bg-slate-50 flex flex-col max-h-[55vh]">
-                    <div className="overflow-x-auto overflow-y-auto flex-grow">
-                      <table className="w-full text-xs text-left">
+                    <div className="overflow-x-auto overflow-y-auto flex-grow p-3 md:p-0">
+                      {/* Desktop Table View */}
+                      <table className="hidden md:table w-full text-xs text-left">
                         <thead className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider sticky top-0 z-10">
                           <tr>
                             <th className="p-2.5 w-[38%]">Descrição</th>
@@ -2087,17 +2088,13 @@ app.post('/api/whatsapp-webhook', async (req, res) => {
                               {/* Grupo */}
                               <td className="p-2">
                                 <select
-                                  className={`w-full bg-slate-50 hover:bg-white border border-slate-200 rounded p-1 text-xs font-semibold focus:outline-hidden ${
-                                    item.groupType === "G1" ? "text-blue-700" :
-                                    item.groupType === "G2" ? "text-violet-700" :
-                                    item.groupType === "G3" ? "text-rose-700" : "text-amber-700"
-                                  }`}
+                                  className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded p-1 text-xs font-semibold focus:outline-hidden text-slate-700"
                                   value={item.groupType}
                                   onChange={(e) => handleUpdatePreviewBillField(item.id, "groupType", e.target.value)}
                                 >
-                                  <option value="G1">G1 - Essencial/Urgente</option>
-                                  <option value="G2">G2 - Importante/Serviços</option>
-                                  <option value="G3">G3 - Impostos/Contornável</option>
+                                  {priorityGroups.map(g => (
+                                    <option key={g.id} value={g.id}>{g.id} - {g.name.split("•")[1]?.trim() || g.name}</option>
+                                  ))}
                                   <option value="WAIT">ESPERAR - Fila de Espera</option>
                                 </select>
                               </td>
@@ -2129,7 +2126,87 @@ app.post('/api/whatsapp-webhook', async (req, res) => {
                           ))}
                         </tbody>
                       </table>
+
+                      {/* Mobile Card List View */}
+                      <div className="block md:hidden space-y-4">
+                        {parsedPreviewBills.map((item) => (
+                          <div key={item.id} className="bg-white border border-slate-200 rounded-xl p-4.5 shadow-sm space-y-3.5 relative hover:border-slate-300 transition-colors">
+                            {/* Header inside Card */}
+                            <div className="flex justify-between items-start">
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.category && (
+                                  <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/60 flex items-center gap-1">
+                                    📁 {item.category}
+                                  </span>
+                                )}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePreviewBill(item.id)}
+                                className="p-2 text-slate-400 hover:text-rose-600 rounded-lg bg-slate-50 hover:bg-rose-50 border border-slate-100 transition-colors cursor-pointer flex items-center justify-center"
+                                title="Remover este item"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            {/* Form Input fields */}
+                            <div className="space-y-3 text-xs">
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Descrição</label>
+                                <input
+                                  type="text"
+                                  className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-medium transition-all"
+                                  value={item.description}
+                                  onChange={(e) => handleUpdatePreviewBillField(item.id, "description", e.target.value)}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Valor (R$)</label>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-mono transition-all"
+                                    value={item.amount || ""}
+                                    onChange={(e) => handleUpdatePreviewBillField(item.id, "amount", parseFloat(e.target.value) || 0)}
+                                  />
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Escopo</label>
+                                  <select
+                                    className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-lg p-2.5 text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-700 transition-all"
+                                    value={item.scope}
+                                    onChange={(e) => handleUpdatePreviewBillField(item.id, "scope", e.target.value)}
+                                  >
+                                    <option value={TransactionScope.PROFESSIONAL}>💼 Escritório (PJ)</option>
+                                    <option value={TransactionScope.PERSONAL}>🏠 Pessoal (PF)</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Grupo de Prioridade</label>
+                                <select
+                                   className="w-full bg-slate-50 hover:bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-semibold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-slate-700"
+                                   value={item.groupType}
+                                   onChange={(e) => handleUpdatePreviewBillField(item.id, "groupType", e.target.value)}
+                                 >
+                                   {priorityGroups.map(g => (
+                                     <option key={g.id} value={g.id}>{g.id} - {g.name.split("•")[1]?.trim() || g.name}</option>
+                                   ))}
+                                   <option value="WAIT">ESPERAR - Fila de Espera</option>
+                                 </select>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
+
                     {/* Tiny summary beneath table */}
                     <div className="bg-slate-100 p-2.5 px-4 text-[11px] text-slate-600 flex justify-between items-center border-t border-slate-200 font-sans">
                       <span>Total Parcial dos items editados:</span>
@@ -2151,11 +2228,11 @@ app.post('/api/whatsapp-webhook', async (req, res) => {
             )}
 
             {/* Actions Footer */}
-            <div className="flex justify-end gap-2 p-4 bg-slate-50 border-t border-slate-200">
+            <div className="flex flex-col sm:flex-row justify-end gap-2 p-4 bg-slate-50 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setIsBulkPasteOpen(false)}
-                className="px-4 py-2 text-xs font-extrabold text-[#64748b] bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2.5 text-xs font-extrabold text-[#64748b] bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer text-center"
               >
                 Cancelar
               </button>
@@ -2163,12 +2240,296 @@ app.post('/api/whatsapp-webhook', async (req, res) => {
                 type="button"
                 onClick={handleImportPreviewBills}
                 disabled={parsedPreviewBills.length === 0}
-                className={`px-5 py-2 text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                className={`w-full sm:w-auto px-5 py-2.5 text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs ${
                   parsedPreviewBills.length === 0 && "opacity-50 cursor-not-allowed bg-indigo-400"
                 }`}
               >
                 <Check className="w-3.5 h-3.5" />
                 Importar {parsedPreviewBills.length} Lançamentos Gerados
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PERSONALIZATION / SETTINGS MODAL */}
+      {isSettingsOpen && (
+        <div id="settings-personalization-modal" className="fixed inset-0 z-50 overflow-y-auto flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-scale-up text-left">
+          <div className="bg-white rounded-2xl w-full max-w-4xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 max-h-[90vh] flex flex-col text-slate-800">
+            {/* Header */}
+            <div className="flex justify-between items-center bg-slate-900 text-white p-4">
+              <div className="flex items-center gap-2 font-sans">
+                <Settings className="w-5 h-5 text-indigo-400" />
+                <h3 className="text-sm font-bold tracking-tight uppercase tracking-wider">
+                  Painel de Personalização
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(false)}
+                className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body with Tab selectors */}
+            <div className="flex-grow overflow-y-auto p-5 space-y-5">
+              {/* Tab navigation */}
+              <div className="flex border-b border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab("groups")}
+                  className={`py-2.5 px-5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                    settingsTab === "groups"
+                      ? "border-indigo-600 text-indigo-600"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  📁 Subgrupos de Prioridade (Despesas)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSettingsTab("categories")}
+                  className={`py-2.5 px-5 text-xs font-bold transition-all border-b-2 cursor-pointer ${
+                    settingsTab === "categories"
+                      ? "border-indigo-600 text-indigo-600"
+                      : "border-transparent text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  🏷️ Categorias de Lançamentos
+                </button>
+              </div>
+
+              {/* TAB 1: Subgroups of priority */}
+              {settingsTab === "groups" && (
+                <div className="space-y-6">
+                  {/* Explanatory notes */}
+                  <div className="bg-indigo-50 border-l-4 border-indigo-500 p-3.5 rounded-r-lg text-xs text-indigo-900">
+                    Aqui você pode gerenciar os subgrupos de priorização. Renomeie o título dos grupos de despesas, mude a cor do indicador visual, delete subgrupos que não usa mais ou crie novos conforme a realidade financeira do seu escritório.
+                  </div>
+
+                  {/* Add group form */}
+                  <form onSubmit={handleAddGroup} className="bg-slate-50 p-4 rounded-xl border border-slate-200 grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                    <div className="md:col-span-6 space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Nome do Novo Subgrupo</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Subgrupo 4 • Custos Operacionais"
+                        value={newGroupName}
+                        onChange={(e) => setNewGroupName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden text-slate-800"
+                      />
+                    </div>
+                    <div className="md:col-span-4 space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">Cor do Indicador</label>
+                      <select
+                        value={newGroupColor}
+                        onChange={(e) => setNewGroupColor(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden text-slate-800 font-semibold"
+                      >
+                        <option value="bg-red-500">🔴 Vermelho</option>
+                        <option value="bg-orange-500">🟠 Laranja</option>
+                        <option value="bg-amber-500">🟡 Amarelo</option>
+                        <option value="bg-emerald-500">🟢 Verde</option>
+                        <option value="bg-blue-500">🔵 Azul</option>
+                        <option value="bg-indigo-500">🟣 Indigo</option>
+                        <option value="bg-[#8b5cf6]">🔮 Violeta</option>
+                        <option value="bg-pink-500">🌸 Rosa</option>
+                        <option value="bg-slate-500">⚫ Slate/Cinza</option>
+                      </select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <button
+                        type="submit"
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-4 rounded-lg transition-colors cursor-pointer shadow-3xs"
+                      >
+                        + Criar
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* List of existing groups */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Subgrupos Ativos</h4>
+                    <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden bg-white">
+                      {priorityGroups.map((g) => (
+                        <div key={g.id} className="p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors">
+                          <div className="flex items-center gap-3 w-full md:w-auto">
+                            <span className={`w-3 h-3 rounded-full shrink-0 ${g.color || "bg-slate-400"}`}></span>
+                            <span className="font-mono text-[10px] font-bold text-slate-400 shrink-0">{g.id}</span>
+                            <input
+                              type="text"
+                              value={g.name}
+                              onChange={(e) => handleRenameGroup(g.id, e.target.value)}
+                              className="bg-transparent hover:bg-slate-100 focus:bg-white border-b border-transparent focus:border-indigo-400 px-1 py-0.5 text-xs text-slate-800 font-semibold w-full md:w-[320px] rounded focus:outline-hidden"
+                            />
+                          </div>
+                          <div className="flex items-center gap-3 self-end md:self-auto shrink-0">
+                            <select
+                              value={g.color || "bg-slate-500"}
+                              onChange={(e) => handleChangeGroupColor(g.id, e.target.value)}
+                              className="bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded px-2 py-1 text-[11px] focus:outline-hidden text-slate-700 font-medium"
+                            >
+                              <option value="bg-red-500">Vermelho</option>
+                              <option value="bg-orange-500">Laranja</option>
+                              <option value="bg-amber-500">Amarelo</option>
+                              <option value="bg-emerald-500">Verde</option>
+                              <option value="bg-blue-500">Azul</option>
+                              <option value="bg-indigo-500">Indigo</option>
+                              <option value="bg-[#8b5cf6]">Violeta</option>
+                              <option value="bg-pink-500">Rosa</option>
+                              <option value="bg-slate-500">Slate/Cinza</option>
+                            </select>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePriorityGroup(g.id)}
+                              className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                              title="Excluir subgrupo"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Custom Categories */}
+              {settingsTab === "categories" && (
+                <div className="space-y-6">
+                  {/* Explanatory notes */}
+                  <div className="bg-indigo-50 border-l-4 border-indigo-500 p-3.5 rounded-r-lg text-xs text-indigo-900">
+                    Configure categorias personalizadas de lançamentos contábeis. Escolha o escopo (Profissional/Escritório ou Pessoal) e o tipo (Receita ou Despesa) para gerenciar a lista de opções exibida nos formulários e nas importações.
+                  </div>
+
+                  {/* Scope and Type selector (sub-tabs) */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatScope(TransactionScope.PROFESSIONAL);
+                        setCatType(TransactionType.EXPENSE);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                        catScope === TransactionScope.PROFESSIONAL && catType === TransactionType.EXPENSE
+                          ? "bg-slate-900 border-slate-900 text-white"
+                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      💼 PJ: Despesas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatScope(TransactionScope.PROFESSIONAL);
+                        setCatType(TransactionType.REVENUE);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                        catScope === TransactionScope.PROFESSIONAL && catType === TransactionType.REVENUE
+                          ? "bg-slate-900 border-slate-900 text-white"
+                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      💼 PJ: Receitas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatScope(TransactionScope.PERSONAL);
+                        setCatType(TransactionType.EXPENSE);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                        catScope === TransactionScope.PERSONAL && catType === TransactionType.EXPENSE
+                          ? "bg-slate-900 border-slate-900 text-white"
+                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      🏠 PF: Despesas
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCatScope(TransactionScope.PERSONAL);
+                        setCatType(TransactionType.REVENUE);
+                      }}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-center cursor-pointer ${
+                        catScope === TransactionScope.PERSONAL && catType === TransactionType.REVENUE
+                          ? "bg-slate-900 border-slate-900 text-white"
+                          : "bg-white hover:bg-slate-50 border-slate-200 text-slate-700"
+                      }`}
+                    >
+                      🏠 PF: Receitas
+                    </button>
+                  </div>
+
+                  {/* Add category form */}
+                  <form onSubmit={handleAddCategorySubmit} className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex gap-3 items-end">
+                    <div className="flex-grow space-y-1">
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase">
+                        Nova Categoria ({catScope === TransactionScope.PROFESSIONAL ? "Escritório/PJ" : "Pessoal/PF"} • {catType === TransactionType.EXPENSE ? "Saída/Despesa" : "Entrada/Receita"})
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ex: Carro, Cavalo, Gasolina, Uber..."
+                        value={newCategoryName}
+                        onChange={(e) => setNewCategoryName(e.target.value)}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-hidden text-slate-800"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-5 rounded-lg transition-colors cursor-pointer shadow-3xs h-[36px]"
+                    >
+                      Adicionar
+                    </button>
+                  </form>
+
+                  {/* Category lists under currently selected Scope+Type */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Categorias Cadastradas</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto p-1 bg-slate-50 rounded-xl border border-slate-200/60">
+                      {(ALL_CATEGORIES_MAP[`${catScope}_${catType}`] || []).map((catName) => {
+                        const isDefault = isDefaultCategory(catScope, catType, catName);
+                        return (
+                          <div key={catName} className="p-2.5 bg-white border border-slate-200/50 rounded-lg flex items-center justify-between text-xs hover:border-slate-300 transition-colors">
+                            <span className="font-semibold text-slate-700">{catName}</span>
+                            {isDefault ? (
+                              <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-0.5 rounded border border-slate-200/50">
+                                Padrão
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => deleteCustomCategory(catScope, catType, catName)}
+                                className="p-1 text-rose-500 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                title="Excluir categoria customizada"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(false)}
+                className="px-5 py-2.5 text-xs font-extrabold text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-all cursor-pointer shadow-3xs"
+              >
+                Concluir e Salvar
               </button>
             </div>
           </div>

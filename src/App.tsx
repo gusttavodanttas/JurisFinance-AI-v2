@@ -869,7 +869,7 @@ export default function App() {
 
       {/* PERSISTENT LEFT SIDEBAR FOR HIGH DENSITY THEME */}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-64 bg-[#0a0f1d] text-white flex flex-col p-5 border-r border-[#1a2333]/40 transition-transform duration-300
+        fixed inset-y-0 left-0 z-50 w-64 bg-[#0a0f1d]/95 backdrop-blur-md md:bg-[#0a0f1d] text-white flex flex-col p-5 border-r border-[#1a2333]/40 transition-transform duration-300
         md:translate-x-0 md:sticky md:top-0 md:flex md:h-screen shrink-0 overflow-y-auto
         ${mobileMenuOpen ? "translate-x-0 font-sans" : "-translate-x-full md:translate-x-0"}
       `}>
@@ -890,9 +890,9 @@ export default function App() {
           <button
             id="nav-tab-dashboard"
             onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "dashboard"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-[#2563eb] shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-blue-950/40 to-slate-900/30 text-white font-bold border-l-4 border-[#2563eb] shadow-md shadow-blue-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -904,9 +904,9 @@ export default function App() {
           <button
             id="nav-tab-ai"
             onClick={() => { setActiveTab("ai"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "ai"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-[#8b5cf6] shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-violet-950/40 to-slate-900/30 text-white font-bold border-l-4 border-[#8b5cf6] shadow-md shadow-violet-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -918,9 +918,9 @@ export default function App() {
           <button
             id="nav-tab-ledger"
             onClick={() => { setActiveTab("ledger"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "ledger"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-[#10b981] shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-emerald-950/40 to-slate-900/30 text-white font-bold border-l-4 border-[#10b981] shadow-md shadow-emerald-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -932,9 +932,9 @@ export default function App() {
           <button
             id="nav-tab-priorities"
             onClick={() => { setActiveTab("priorities"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "priorities"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-amber-500 shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-amber-950/40 to-slate-900/30 text-white font-bold border-l-4 border-amber-500 shadow-md shadow-amber-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -946,9 +946,9 @@ export default function App() {
           <button
             id="nav-tab-metas"
             onClick={() => { setActiveTab("metas"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "metas"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-indigo-500 shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-indigo-950/40 to-slate-900/30 text-white font-bold border-l-4 border-indigo-500 shadow-md shadow-indigo-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -960,9 +960,9 @@ export default function App() {
           <button
             id="nav-tab-report"
             onClick={() => { setActiveTab("report"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "report"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-[#ef4444] shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-rose-950/40 to-slate-900/30 text-white font-bold border-l-4 border-[#ef4444] shadow-md shadow-rose-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -974,9 +974,9 @@ export default function App() {
           <button
             id="nav-tab-whatsapp"
             onClick={() => { setActiveTab("whatsapp"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "whatsapp"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-[#128c7e] shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-teal-950/40 to-slate-900/30 text-white font-bold border-l-4 border-[#128c7e] shadow-md shadow-teal-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -988,9 +988,9 @@ export default function App() {
           <button
             id="nav-tab-users"
             onClick={() => { setActiveTab("users"); setMobileMenuOpen(false); }}
-            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer ${
+            className={`w-full flex items-center gap-3 py-2.5 px-3.5 rounded-xl text-xs font-semibold tracking-wide transition-all duration-200 cursor-pointer hover:translate-x-1 ${
               activeTab === "users"
-                ? "bg-[#1e293b]/60 text-white font-bold border-l-4 border-violet-500 shadow-[inset_1px_0_0_rgba(255,255,255,0.05),0_1px_3px_rgba(0,0,0,0.1)]"
+                ? "bg-gradient-to-r from-purple-950/40 to-slate-900/30 text-white font-bold border-l-4 border-violet-500 shadow-md shadow-violet-900/10"
                 : "text-slate-400 hover:text-white hover:bg-white/5"
             }`}
           >
@@ -1024,7 +1024,7 @@ export default function App() {
       {mobileMenuOpen && (
         <div 
           onClick={() => setMobileMenuOpen(false)}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-30 md:hidden"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-30 md:hidden"
         />
       )}
 

@@ -27,7 +27,7 @@ export interface PriorityBill {
   amount: number;
   scope: TransactionScope;
   status: "PAGAR" | "ESPERAR";
-  groupType: "G1" | "G2" | "G3" | "WAIT";
+  groupType: string;
   paid?: boolean;
   notes?: string;
   month?: string; // YYYY-MM selected month
@@ -92,12 +92,72 @@ export const PERSONAL_EXPENSE_CATEGORIES = [
   "Lazer, Viagens e Hobbies",
   "Educação e Livros",
   "Vestuário e Gastos Pessoais",
+  "Carro",
+  "Cavalo",
   "Outras Despesas Pessoais",
 ];
 
+const getCustomCategories = (key: string, defaults: string[]): string[] => {
+  try {
+    const gdEmail = sessionStorage.getItem("gd_auth_email") || "default";
+    const saved = localStorage.getItem(`custom_categories_${gdEmail}_${key}`);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return Array.from(new Set([...defaults, ...parsed]));
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
+  return defaults;
+};
+
 export const ALL_CATEGORIES_MAP: Record<string, string[]> = {
-  [`${TransactionScope.PROFESSIONAL}_${TransactionType.REVENUE}`]: PROFESSIONAL_REVENUE_CATEGORIES,
-  [`${TransactionScope.PROFESSIONAL}_${TransactionType.EXPENSE}`]: PROFESSIONAL_EXPENSE_CATEGORIES,
-  [`${TransactionScope.PERSONAL}_${TransactionType.REVENUE}`]: PERSONAL_REVENUE_CATEGORIES,
-  [`${TransactionScope.PERSONAL}_${TransactionType.EXPENSE}`]: PERSONAL_EXPENSE_CATEGORIES,
+  get [`${TransactionScope.PROFESSIONAL}_${TransactionType.REVENUE}`]() {
+    return getCustomCategories(`${TransactionScope.PROFESSIONAL}_${TransactionType.REVENUE}`, PROFESSIONAL_REVENUE_CATEGORIES);
+  },
+  get [`${TransactionScope.PROFESSIONAL}_${TransactionType.EXPENSE}`]() {
+    return getCustomCategories(`${TransactionScope.PROFESSIONAL}_${TransactionType.EXPENSE}`, PROFESSIONAL_EXPENSE_CATEGORIES);
+  },
+  get [`${TransactionScope.PERSONAL}_${TransactionType.REVENUE}`]() {
+    return getCustomCategories(`${TransactionScope.PERSONAL}_${TransactionType.REVENUE}`, PERSONAL_REVENUE_CATEGORIES);
+  },
+  get [`${TransactionScope.PERSONAL}_${TransactionType.EXPENSE}`]() {
+    return getCustomCategories(`${TransactionScope.PERSONAL}_${TransactionType.EXPENSE}`, PERSONAL_EXPENSE_CATEGORIES);
+  }
+};
+
+export const addCustomCategory = (scope: TransactionScope, type: TransactionType, categoryName: string) => {
+  try {
+    const gdEmail = sessionStorage.getItem("gd_auth_email") || "default";
+    const key = `${scope}_${type}`;
+    const saved = localStorage.getItem(`custom_categories_${gdEmail}_${key}`);
+    const currentCustom = saved ? JSON.parse(saved) : [];
+    if (!currentCustom.includes(categoryName)) {
+      currentCustom.push(categoryName);
+      localStorage.setItem(`custom_categories_${gdEmail}_${key}`, JSON.stringify(currentCustom));
+      window.dispatchEvent(new Event("categories_updated"));
+    }
+  } catch (e) {
+    console.error(e);
+  }
+};
+
+export const deleteCustomCategory = (scope: TransactionScope, type: TransactionType, categoryName: string) => {
+  try {
+    const gdEmail = sessionStorage.getItem("gd_auth_email") || "default";
+    const key = `${scope}_${type}`;
+    const saved = localStorage.getItem(`custom_categories_${gdEmail}_${key}`);
+    if (saved) {
+      let currentCustom = JSON.parse(saved);
+      if (Array.isArray(currentCustom)) {
+        currentCustom = currentCustom.filter(c => c !== categoryName);
+        localStorage.setItem(`custom_categories_${gdEmail}_${key}`, JSON.stringify(currentCustom));
+        window.dispatchEvent(new Event("categories_updated"));
+      }
+    }
+  } catch (e) {
+    console.error(e);
+  }
 };
