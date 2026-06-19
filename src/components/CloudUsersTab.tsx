@@ -45,7 +45,7 @@ export default function CloudUsersTab() {
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-900">Usuários Registrados em Nuvem</h2>
           <p className="text-xs text-slate-500">
-            Abaixo estão documentados todos os advogados com acesso ativo que se cadastraram em nossa infraestrutura integrada no Firestore.
+            Abaixo estão documentados todos os advogados com acesso ativo que se cadastraram em nossa infraestrutura integrada no Supabase.
           </p>
         </div>
         <button
@@ -77,7 +77,7 @@ export default function CloudUsersTab() {
           </div>
           <div>
             <p className="text-[10px] text-slate-500 uppercase tracking-wilder font-bold font-mono">Infraestrutura</p>
-            <h3 className="text-sm font-bold text-emerald-700 mt-1">Firebase Firestore</h3>
+            <h3 className="text-sm font-bold text-emerald-700 mt-1">Supabase (PostgreSQL)</h3>
           </div>
         </div>
 

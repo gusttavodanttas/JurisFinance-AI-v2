@@ -1,5 +1,4 @@
-import { db } from "../firebase";
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from "../supabase";
 import { Transaction, PriorityBill } from "../types";
 
 export interface UserFinancials {
@@ -8,52 +7,74 @@ export interface UserFinancials {
   updatedAt?: any;
 }
 
-const COLLECTION_NAME = "financials";
-
-// Fetch consolidated financials (transactions & priority bills) from Firestore for a given user email
-export async function getUserFinancials(email: string): Promise<UserFinancials | null> {
+// Fetch consolidated financials from Supabase for a given user email
+export async function getUserFinancials(
+  email: string
+): Promise<UserFinancials | null> {
   if (!email) return null;
   const cleanEmail = email.toLowerCase().trim();
   try {
-    const docRef = doc(db, COLLECTION_NAME, cleanEmail);
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      return docSnap.data() as UserFinancials;
+    const { data, error } = await supabase
+      .from("financials")
+      .select("*")
+      .eq("email", cleanEmail)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (data) {
+      return {
+        transactions: data.transactions || [],
+        priorityBills: data.priority_bills || [],
+        updatedAt: data.updated_at,
+      } as UserFinancials;
     }
   } catch (error) {
-    console.error("Erro ao carregar dados financeiros do Firestore:", error);
+    console.error("Erro ao carregar dados financeiros do Supabase:", error);
   }
   return null;
 }
 
-// Save consolidated financials (transactions & priority bills) to Firestore for a given user email
-export async function saveUserFinancials(email: string, data: UserFinancials): Promise<boolean> {
+// Save consolidated financials to Supabase for a given user email
+export async function saveUserFinancials(
+  email: string,
+  data: UserFinancials
+): Promise<boolean> {
   if (!email) return false;
   const cleanEmail = email.toLowerCase().trim();
   try {
-    const docRef = doc(db, COLLECTION_NAME, cleanEmail);
-    await setDoc(docRef, {
-      transactions: data.transactions,
-      priorityBills: data.priorityBills,
-      updatedAt: serverTimestamp(),
-    });
+    const { error } = await supabase.from("financials").upsert(
+      {
+        email: cleanEmail,
+        transactions: data.transactions,
+        priority_bills: data.priorityBills,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "email" }
+    );
+
+    if (error) throw error;
     return true;
   } catch (error) {
-    console.error("Erro ao salvar dados financeiros no Firestore:", error);
+    console.error("Erro ao salvar dados financeiros no Supabase:", error);
     return false;
   }
 }
 
-// Clear all financials in Firestore for a user (delete document)
+// Clear all financials in Supabase for a user (delete row)
 export async function clearUserFinancials(email: string): Promise<boolean> {
   if (!email) return false;
   const cleanEmail = email.toLowerCase().trim();
   try {
-    const docRef = doc(db, COLLECTION_NAME, cleanEmail);
-    await deleteDoc(docRef);
+    const { error } = await supabase
+      .from("financials")
+      .delete()
+      .eq("email", cleanEmail);
+
+    if (error) throw error;
     return true;
   } catch (error) {
-    console.error("Erro ao limpar dados financeiros do Firestore:", error);
+    console.error("Erro ao limpar dados financeiros do Supabase:", error);
     return false;
   }
 }

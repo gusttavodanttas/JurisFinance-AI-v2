@@ -1059,13 +1059,13 @@ export default function App() {
                 {syncStatus === "syncing" && (
                   <span className="text-[8px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-full border border-blue-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none animate-pulse">
                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                    Nuvem: Sincronizando
+                    Supabase: Sincronizando
                   </span>
                 )}
                 {syncStatus === "synced" && (
                   <span className="text-[8px] font-mono bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-100 font-extrabold tracking-wider uppercase flex items-center gap-1 select-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    Nuvem: Sincronizado
+                    Supabase: Sincronizado
                   </span>
                 )}
                 {syncStatus === "error" && (
@@ -1180,7 +1180,7 @@ export default function App() {
           {isLoadingCloud && (
             <div className="absolute inset-0 bg-slate-50/70 backdrop-blur-xs z-50 flex flex-col items-center justify-center space-y-3 py-20 rounded-xl">
               <div className="w-10 h-10 border-4 border-violet-500/35 border-t-violet-600 rounded-full animate-spin"></div>
-              <p className="text-xs font-semibold text-slate-500 animate-pulse font-sans">Sincronizando com o Banco de Dados em Nuvem...</p>
+              <p className="text-xs font-semibold text-slate-500 animate-pulse font-sans">Sincronizando com o Banco de Dados Supabase...</p>
             </div>
           )}
         
