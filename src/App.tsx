@@ -1313,10 +1313,21 @@ export default function App() {
 
           const handleUpdateCurrentMonthBills = (updatedMonthBills: PriorityBill[]) => {
             setPriorityBills((prev) => {
-              const otherMonthsBills = prev.filter(b => b.month !== targetMonthForPriorities);
-              // Ensure all updated/added bills are marked with current selected month
-              const processed = updatedMonthBills.map(b => ({ ...b, month: targetMonthForPriorities }));
-              return [...otherMonthsBills, ...processed];
+              const otherMonthsBills = prev.filter(b => (b.month || "2026-06") !== targetMonthForPriorities);
+              
+              const currentMonthProcessed = updatedMonthBills
+                .filter(b => (b.month || targetMonthForPriorities) === targetMonthForPriorities)
+                .map(b => ({ ...b, month: targetMonthForPriorities }));
+                
+              const otherMonthsProcessed = updatedMonthBills
+                .filter(b => (b.month || targetMonthForPriorities) !== targetMonthForPriorities)
+                .map(b => ({ ...b, month: b.month || targetMonthForPriorities }));
+
+              const otherMonthsFiltered = otherMonthsBills.filter(
+                oldBill => !otherMonthsProcessed.some(newBill => newBill.id === oldBill.id)
+              );
+
+              return [...otherMonthsFiltered, ...currentMonthProcessed, ...otherMonthsProcessed];
             });
           };
 

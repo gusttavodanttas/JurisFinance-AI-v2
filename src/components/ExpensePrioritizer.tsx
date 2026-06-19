@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { 
   PriorityBill, 
   TransactionScope, 
@@ -82,7 +82,7 @@ export default function ExpensePrioritizer({
   const [amountVal, setAmountVal] = useState("");
   const [scopeVal, setScopeVal] = useState<TransactionScope>(TransactionScope.PROFESSIONAL);
   const [targetStatus, setTargetStatus] = useState<"PAGAR" | "ESPERAR">("PAGAR");
-  const [targetGroup, setTargetGroup] = useState<string>("G1");
+  const [targetGroup, setTargetGroup] = useState<string>("P1");
   const [filterScope, setFilterScope] = useState<"ALL" | "PROFESSIONAL" | "PERSONAL">("ALL");
 
   // Recurring & installments options
@@ -99,15 +99,25 @@ export default function ExpensePrioritizer({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Migrate old G1, G2, G3 keys to P1, P2, P3
+          const migrated = parsed.map(g => {
+            if (g.id === "G1") return { ...g, id: "P1", name: g.name.replace("G1", "P1").replace("G-1", "P-1") };
+            if (g.id === "G2") return { ...g, id: "P2", name: g.name.replace("G2", "P2").replace("G-2", "P-2") };
+            if (g.id === "G3") return { ...g, id: "P3", name: g.name.replace("G3", "P3").replace("G-3", "P-3") };
+            return g;
+          });
+          localStorage.setItem(`priority_groups_${gdEmail}`, JSON.stringify(migrated));
+          return migrated;
+        }
       } catch (e) {
         console.error(e);
       }
     }
     return [
-      { id: "G1", name: "Subgrupo 1 • Custos Urgentes", color: "bg-red-500" },
-      { id: "G2", name: "Subgrupo 2 • Acordos e Lazer", color: "bg-orange-500" },
-      { id: "G3", name: "Subgrupo 3 • Assinaturas e Planos", color: "bg-[#8b5cf6]" }
+      { id: "P1", name: "Subgrupo 1 • Custos Urgentes", color: "bg-red-500" },
+      { id: "P2", name: "Subgrupo 2 • Acordos e Lazer", color: "bg-orange-500" },
+      { id: "P3", name: "Subgrupo 3 • Assinaturas e Planos", color: "bg-[#8b5cf6]" }
     ];
   });
 
@@ -118,6 +128,20 @@ export default function ExpensePrioritizer({
     window.addEventListener("categories_updated", handler);
     return () => window.removeEventListener("categories_updated", handler);
   }, []);
+
+  // Migrate G1/G2/G3 keys in existing bills to P1/P2/P3
+  useEffect(() => {
+    const hasOldGroups = bills.some(b => b.groupType === "G1" || b.groupType === "G2" || b.groupType === "G3");
+    if (hasOldGroups) {
+      const migrated = bills.map(b => {
+        if (b.groupType === "G1") return { ...b, groupType: "P1" };
+        if (b.groupType === "G2") return { ...b, groupType: "P2" };
+        if (b.groupType === "G3") return { ...b, groupType: "P3" };
+        return b;
+      });
+      onUpdateBills(migrated);
+    }
+  }, [bills, onUpdateBills]);
 
   // Settings Tab and forms states
   const [settingsTab, setSettingsTab] = useState<"groups" | "categories">("groups");
@@ -836,29 +860,46 @@ export default function ExpensePrioritizer({
     onUpdateBills(updated);
   };
 
+  // Helper to update field of an individual bill and notify parent state
+  const handleUpdateBillField = (id: string, field: keyof PriorityBill, value: any) => {
+    const updated = bills.map(b => b.id === id ? { ...b, [field]: value } : b);
+    onUpdateBills(updated);
+  };
+
   // Filter bills by scope
-  const filteredBills = bills.filter((b) => {
-    if (filterScope === "ALL") return true;
-    return b.scope === filterScope;
-  });
+  const filteredBills = useMemo(() => {
+    return bills.filter((b) => {
+      if (filterScope === "ALL") return true;
+      return b.scope === filterScope;
+    });
+  }, [bills, filterScope]);
 
   // Calculate sum of groupType functions
-  const getSubgroupTotals = (group: string) => {
+  const getSubgroupTotals = useCallback((group: string) => {
     const list = filteredBills.filter((b) => b.status === "PAGAR" && b.groupType === group && !b.paid);
     const sum = list.reduce((acc, curr) => acc + curr.amount, 0);
     return { sum, count: list.length, items: list };
-  };
+  }, [filteredBills]);
 
-  const pagarList = filteredBills.filter((b) => b.status === "PAGAR");
-  const totalPagar = pagarList.reduce((acc, curr) => acc + (curr.paid ? 0 : curr.amount), 0);
-  const countPagar = pagarList.filter(b => !b.paid).length;
+  const { totalPagar, countPagar, pagarList } = useMemo(() => {
+    const list = filteredBills.filter((b) => b.status === "PAGAR");
+    const sum = list.reduce((acc, curr) => acc + (curr.paid ? 0 : curr.amount), 0);
+    const count = list.filter(b => !b.paid).length;
+    return { totalPagar: sum, countPagar: count, pagarList: list };
+  }, [filteredBills]);
 
-  const esperarList = filteredBills.filter((b) => b.status === "ESPERAR");
-  const totalEsperar = esperarList.reduce((acc, curr) => acc + (curr.paid ? 0 : curr.amount), 0);
-  const countEsperar = esperarList.filter(b => !b.paid).length;
+  const { totalEsperar, countEsperar, esperarList } = useMemo(() => {
+    const list = filteredBills.filter((b) => b.status === "ESPERAR");
+    const sum = list.reduce((acc, curr) => acc + (curr.paid ? 0 : curr.amount), 0);
+    const count = list.filter(b => !b.paid).length;
+    return { totalEsperar: sum, countEsperar: count, esperarList: list };
+  }, [filteredBills]);
 
-  const totalPaid = bills.filter(b => b.paid).reduce((acc, curr) => acc + curr.amount, 0);
-  const countPaid = bills.filter(b => b.paid).length;
+  const { totalPaid, countPaid } = useMemo(() => {
+    const list = filteredBills.filter(b => b.paid);
+    const sum = list.reduce((acc, curr) => acc + curr.amount, 0);
+    return { totalPaid: sum, countPaid: list.length };
+  }, [filteredBills]);
 
   return (
     <div id="expense-prioritizer" className="space-y-6">
@@ -1200,7 +1241,7 @@ export default function ExpensePrioritizer({
                         totals.items.map(b => (
                           <div key={b.id} id={`bill-item-${b.id}`} className="transition-all">
                             {/* DESKTOP ROW */}
-                            <div className="hidden md:flex p-2.5 bg-white items-center justify-between gap-4 text-xs group hover:bg-slate-50/50">
+                            <div className="hidden md:flex p-3 bg-white items-center justify-between gap-4 text-xs group hover:bg-indigo-50/20 hover:scale-[1.01] hover:shadow-xs transition-all duration-200 border-b border-slate-100 last:border-b-0 animate-slide-up">
                               <div className="flex items-center gap-2.5 min-w-0">
                                 {b.scope === TransactionScope.PROFESSIONAL ? (
                                   <div className="p-1 px-1.5 bg-blue-50 text-[#2563eb] rounded font-mono text-[9px] font-bold shrink-0 border border-blue-200">PJ</div>
@@ -1210,11 +1251,18 @@ export default function ExpensePrioritizer({
                                 <div className="truncate">
                                   <span className="font-bold text-slate-800 leading-tight block truncate" title={b.description}>{b.description}</span>
                                   {b.notes && <p className="text-[10px] text-slate-400 leading-none mt-0.5">{b.notes}</p>}
-                                  {b.category && (
-                                    <span className="inline-block text-[8px] font-extrabold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100/60 mt-1">
-                                      📁 {b.category}
-                                    </span>
-                                  )}
+                                  <div className="mt-1">
+                                    <select
+                                      value={b.category || ""}
+                                      onChange={(e) => handleUpdateBillField(b.id, "category", e.target.value)}
+                                      className="inline-block text-[9px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/60 border border-indigo-150 rounded cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-indigo-500 py-0.5 px-1 max-w-[170px] truncate"
+                                    >
+                                      <option value="">📁 Sem Categoria</option>
+                                      {(ALL_CATEGORIES_MAP[`${b.scope}_${TransactionType.EXPENSE}`] || []).map(c => (
+                                        <option key={c} value={c}>{c}</option>
+                                      ))}
+                                    </select>
+                                  </div>
                                 </div>
                               </div>
 
@@ -1253,7 +1301,7 @@ export default function ExpensePrioritizer({
                             </div>
 
                             {/* MOBILE CARD VIEW */}
-                            <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-slate-50/40 border-b border-slate-100 last:border-b-0">
+                            <div className="flex md:hidden p-4 bg-white flex-col gap-3.5 text-xs hover:bg-indigo-50/20 active:scale-[0.99] hover:shadow-xs transition-all duration-200 border-b border-slate-100 last:border-b-0 animate-slide-up">
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-1.5">
                                   {b.scope === TransactionScope.PROFESSIONAL ? (
@@ -1300,13 +1348,18 @@ export default function ExpensePrioritizer({
                                     {b.notes}
                                   </p>
                                 )}
-                                {b.category && (
-                                  <div className="mt-1">
-                                    <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100/60">
-                                      📁 {b.category}
-                                    </span>
-                                  </div>
-                                )}
+                                <div className="mt-1">
+                                  <select
+                                    value={b.category || ""}
+                                    onChange={(e) => handleUpdateBillField(b.id, "category", e.target.value)}
+                                    className="inline-block text-[9px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/60 border border-indigo-150 rounded cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-indigo-500 py-0.5 px-2 max-w-full"
+                                  >
+                                    <option value="">📁 Sem Categoria</option>
+                                    {(ALL_CATEGORIES_MAP[`${b.scope}_${TransactionType.EXPENSE}`] || []).map(c => (
+                                      <option key={c} value={c}>{c}</option>
+                                    ))}
+                                  </select>
+                                </div>
                               </div>
 
                               <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
@@ -1370,6 +1423,18 @@ export default function ExpensePrioritizer({
                           <div className="truncate">
                             <p className="font-bold text-slate-800 leading-tight block">{b.description}</p>
                             {b.notes && <p className="text-[10px] text-slate-400">{b.notes}</p>}
+                            <div className="mt-1">
+                              <select
+                                value={b.category || ""}
+                                onChange={(e) => handleUpdateBillField(b.id, "category", e.target.value)}
+                                className="inline-block text-[9px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/60 border border-indigo-150 rounded cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-indigo-500 py-0.5 px-1 max-w-[170px] truncate"
+                              >
+                                <option value="">📁 Sem Categoria</option>
+                                {(ALL_CATEGORIES_MAP[`${b.scope}_${TransactionType.EXPENSE}`] || []).map(c => (
+                                  <option key={c} value={c}>{c}</option>
+                                ))}
+                              </select>
+                            </div>
                           </div>
                         </div>
                         <span className="font-mono font-bold text-slate-800 text-right shrink-0">{formatCurrency(b.amount)}</span>
@@ -1396,7 +1461,7 @@ export default function ExpensePrioritizer({
                     </div>
 
                     {/* MOBILE WAIT CARD */}
-                    <div className="flex md:hidden p-3.5 bg-white border border-slate-100 rounded-lg flex-col gap-3.5 text-xs hover:bg-slate-50/40 my-2 shadow-2xs">
+                    <div className="flex md:hidden p-3.5 bg-white border border-slate-100 hover:border-indigo-100/60 rounded-xl flex-col gap-3.5 text-xs hover:bg-indigo-50/20 my-2 active:scale-[0.99] hover:shadow-xs transition-all duration-200 shadow-2xs animate-slide-up">
                       {/* Header Line */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1">
@@ -1435,6 +1500,18 @@ export default function ExpensePrioritizer({
                             {b.notes}
                           </p>
                         )}
+                        <div className="mt-1">
+                          <select
+                            value={b.category || ""}
+                            onChange={(e) => handleUpdateBillField(b.id, "category", e.target.value)}
+                            className="inline-block text-[9px] font-extrabold text-indigo-700 bg-indigo-50 hover:bg-indigo-100/60 border border-indigo-150 rounded cursor-pointer focus:outline-hidden focus:ring-1 focus:ring-indigo-500 py-0.5 px-2 max-w-full"
+                          >
+                            <option value="">📁 Sem Categoria</option>
+                            {(ALL_CATEGORIES_MAP[`${b.scope}_${TransactionType.EXPENSE}`] || []).map(c => (
+                              <option key={c} value={c}>{c}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
                       {/* Footer: Price and trigger */}
