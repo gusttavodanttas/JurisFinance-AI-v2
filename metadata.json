@@ -1,0 +1,6 @@
+{
+  "name": "Controle Financeiro de Advocacia - Nuvem",
+  "description": "Plataforma de gestão de finanças pessoais e profissionais para advogados com inteligência artificial para separação e categorização automática.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
