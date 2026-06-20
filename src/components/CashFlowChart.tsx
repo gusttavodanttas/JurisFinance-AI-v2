@@ -48,7 +48,7 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
   };
 
   const finalData = sortedMonths.map((m) => {
-    const monthTx = transactions.filter((t) => t.date.substring(0, 7) === m);
+    const monthTx = transactions.filter((t) => t.date.substring(0, 7) === m && t.status !== "PREVISTO");
     
     let profRevenue = 0;
     let profExpense = 0;

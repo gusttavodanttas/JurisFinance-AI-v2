@@ -15,7 +15,8 @@ import {
   FileCheck2,
   X,
   Plus,
-  Edit3
+  Edit3,
+  Check
 } from "lucide-react";
 
 interface TransactionListProps {
@@ -26,6 +27,7 @@ interface TransactionListProps {
   onEditTransaction?: (transaction: Transaction) => void;
   onTriggerNewTransaction?: () => void;
   onClearAllTransactions?: () => void;
+  onConfirmTransaction?: (id: string) => void;
 }
 
 export default function TransactionList({
@@ -36,6 +38,7 @@ export default function TransactionList({
   onEditTransaction,
   onTriggerNewTransaction,
   onClearAllTransactions,
+  onConfirmTransaction,
 }: TransactionListProps) {
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<"ALL" | TransactionScope>("ALL");
@@ -338,7 +341,14 @@ export default function TransactionList({
 
                     {/* Description & notes */}
                     <td className="py-2.5 px-3 max-w-xs">
-                      <div className="font-semibold text-slate-900 leading-snug truncate" title={t.description}>{t.description}</div>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-semibold text-slate-900 leading-snug truncate" title={t.description}>{t.description}</span>
+                        {t.status === "PREVISTO" && (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                            {isRevenue ? "A receber" : "A pagar"}
+                          </span>
+                        )}
+                      </div>
                       {t.notes && (
                         <div className="text-[10px] text-slate-400 mt-0.5 leading-snug truncate max-w-xs" title={t.notes}>
                           {t.notes}
@@ -366,6 +376,17 @@ export default function TransactionList({
                     {/* Actions */}
                     <td className="py-2.5 px-3 text-center whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1">
+                        {onConfirmTransaction && t.status === "PREVISTO" && (
+                          <button
+                            id={`confirm-tx-${t.id}`}
+                            type="button"
+                            onClick={() => onConfirmTransaction(t.id)}
+                            className="p-1 px-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                            title={isRevenue ? "Confirmar recebimento (Marcar como recebido)" : "Confirmar pagamento (Marcar como pago)"}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                         {onEditTransaction && (
                           <button
                             id={`edit-tx-${t.id}`}
@@ -447,7 +468,14 @@ export default function TransactionList({
 
                 {/* Description and notes */}
                 <div className="space-y-1">
-                  <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">{t.description}</h4>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm leading-snug">{t.description}</h4>
+                    {t.status === "PREVISTO" && (
+                      <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200">
+                        {isRevenue ? "A receber" : "A pagar"}
+                      </span>
+                    )}
+                  </div>
                   {t.notes && <p className="text-[11px] text-slate-400 bg-slate-50/40 p-1.5 rounded border border-slate-100">{t.notes}</p>}
                   
                   {/* Category & payment method details */}
@@ -471,6 +499,17 @@ export default function TransactionList({
                   
                   {/* Highly visible Edit & Delete triggers for smaller displays */}
                   <div className="flex items-center gap-1.5">
+                    {onConfirmTransaction && t.status === "PREVISTO" && (
+                      <button
+                        id={`confirm-card-tx-${t.id}`}
+                        type="button"
+                        onClick={() => onConfirmTransaction(t.id)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-100 font-bold transition-all cursor-pointer"
+                      >
+                        <Check className="w-3 h-3" />
+                        Confirmar
+                      </button>
+                    )}
                     {onEditTransaction && (
                       <button
                         id={`edit-card-tx-${t.id}`}

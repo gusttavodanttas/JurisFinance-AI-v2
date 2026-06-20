@@ -17,10 +17,10 @@ interface DashboardStatsProps {
 }
 
 export default function DashboardStats({ transactions, selectedMonth }: DashboardStatsProps) {
-  // Filter transactions for current month
+  // Filter transactions for current month and only include realized transactions in cash balances
   const filtered = transactions.filter((t) => {
-    if (selectedMonth === "ALL") return true;
-    return t.date.substring(0, 7) === selectedMonth;
+    const matchesMonth = selectedMonth === "ALL" || t.date.substring(0, 7) === selectedMonth;
+    return matchesMonth && t.status !== "PREVISTO";
   });
 
   // Calculate totals

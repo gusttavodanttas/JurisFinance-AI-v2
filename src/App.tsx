@@ -45,6 +45,8 @@ import NewTransactionModal from "./components/NewTransactionModal";
 import ExpensePrioritizer from "./components/ExpensePrioritizer";
 import WhatsAppTab from "./components/WhatsAppTab";
 import { ContractGoalsSim } from "./components/ContractGoalsSim";
+import ForecastComparison from "./components/ForecastComparison";
+import CategoryChartsView from "./components/CategoryChartsView";
 import { INITIAL_PRIORITY_BILLS } from "./mockData";
 import { PriorityBill } from "./types";
 import { getFirestoreUser, createFirestoreUser, getAllFirestoreUsers, FirestoreUser } from "./lib/usersDb";
@@ -637,6 +639,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [dashboardSubTab, setDashboardSubTab] = useState<"overview" | "forecast" | "categories">("overview");
 
   // Profile customization states
   const [userName, setUserName] = useState<string>(() => {
@@ -713,6 +716,10 @@ export default function App() {
 
   const handleUpdateTransaction = (updated: Transaction) => {
     setTransactions((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+  };
+
+  const handleConfirmTransaction = (id: string) => {
+    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, status: "REALIZADO" } : t)));
   };
 
   const handleDeleteTransaction = (id: string) => {
@@ -1185,6 +1192,7 @@ export default function App() {
           )}
         
         {/* VIEW 1: PANEL / CONTROLLER VIEW */}
+        {/* VIEW 1: PANEL / CONTROLLER VIEW */}
         {activeTab === "dashboard" && (
           <div id="view-dashboard-container" className="space-y-6">
             
@@ -1197,47 +1205,103 @@ export default function App() {
               <span className="text-[10px] text-slate-400 font-mono italic">Atualizado hoje às {new Date().toLocaleTimeString("pt-BR", {hour: '2-digit', minute:'2-digit'})}</span>
             </div>
 
-            {/* Cards Stats Indicators */}
-            <DashboardStats transactions={transactions} selectedMonth={selectedMonth} />
-
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <div className="xl:col-span-2">
-                <CashFlowChart transactions={transactions} />
-              </div>
-              <div className="xl:col-span-1">
-                {/* Embedded quick guidelines card */}
-                <div id="dashboard-guidelines-box" className="bg-slate-900 text-white rounded-xl border border-slate-800 p-5 shadow-xs space-y-4 flex flex-col justify-between h-full min-h-[340px]">
-                  <div>
-                    <h3 className="text-xs font-semibold text-indigo-400 tracking-wider uppercase flex items-center gap-1.5">
-                      <Sparkles className="w-4 h-4" />
-                      Práticas de Blindagem Patrimonial
-                    </h3>
-                    <p className="text-xl font-bold mt-1 text-slate-100">Guarde seu caixa corporativo!</p>
-                  </div>
-                  
-                  <div className="space-y-3.5 text-xs text-slate-300">
-                    <p className="leading-relaxed">
-                      Sua conta física deve ser o destino das retiradas de lucros. Evite pagar o colégio dos filhos ou compras de mercado diretamente pelo CNPJ do escritório.
-                    </p>
-                    <div className="bg-indigo-950/50 p-3 rounded-lg border border-indigo-900 text-[11px] text-indigo-300 leading-normal">
-                      💡 <b>Dica de IA:</b> Cole seu extrato bancário semanal ou mensal na guia <b>Conciliação com IA</b> para separar os gastos irregulares de uma vez só.
-                    </div>
-                  </div>
-
-                  <button
-                    id="goto-ai-tab-btn"
-                    onClick={() => setActiveTab("ai")}
-                    className="w-full text-center py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all"
-                  >
-                    Ir para Separador com IA
-                  </button>
-                </div>
-              </div>
+            {/* Dashboard Sub-Tabs Selector */}
+            <div className="flex border-b border-slate-200 pb-0.5 overflow-x-auto scrollbar-none font-sans gap-2">
+              <button
+                type="button"
+                onClick={() => setDashboardSubTab("overview")}
+                className={`py-2 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                  dashboardSubTab === "overview"
+                    ? "border-indigo-600 text-indigo-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                📊 Visão Geral
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardSubTab("forecast")}
+                className={`py-2 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                  dashboardSubTab === "forecast"
+                    ? "border-indigo-600 text-indigo-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                ⚖️ Previsto x Realizado
+              </button>
+              <button
+                type="button"
+                onClick={() => setDashboardSubTab("categories")}
+                className={`py-2 px-3 text-xs font-bold border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+                  dashboardSubTab === "categories"
+                    ? "border-indigo-600 text-indigo-700 font-extrabold"
+                    : "border-transparent text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                🍩 Gráficos por Categoria
+              </button>
             </div>
 
-            {/* Bento Categories Distribuction */}
-            <CategoryPieChart transactions={transactions} selectedMonth={selectedMonth} />
+            {dashboardSubTab === "overview" && (
+              <div className="space-y-6 animate-slide-up">
+                {/* Cards Stats Indicators */}
+                <DashboardStats transactions={transactions} selectedMonth={selectedMonth} />
+
+                {/* Charts Grid */}
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                  <div className="xl:col-span-2">
+                    <CashFlowChart transactions={transactions} />
+                  </div>
+                  <div className="xl:col-span-1">
+                    {/* Embedded quick guidelines card */}
+                    <div id="dashboard-guidelines-box" className="bg-slate-900 text-white rounded-xl border border-slate-800 p-5 shadow-xs space-y-4 flex flex-col justify-between h-full min-h-[340px]">
+                      <div>
+                        <h3 className="text-xs font-semibold text-indigo-400 tracking-wider uppercase flex items-center gap-1.5">
+                          <Sparkles className="w-4 h-4" />
+                          Práticas de Blindagem Patrimonial
+                        </h3>
+                        <p className="text-xl font-bold mt-1 text-slate-100">Guarde seu caixa corporativo!</p>
+                      </div>
+                      
+                      <div className="space-y-3.5 text-xs text-slate-300 font-sans">
+                        <p className="leading-relaxed">
+                          Sua conta física deve ser o destino das retiradas de lucros. Evite pagar o colégio dos filhos ou compras de mercado diretamente pelo CNPJ do escritório.
+                        </p>
+                        <div className="bg-indigo-950/50 p-3 rounded-lg border border-indigo-900 text-[11px] text-indigo-300 leading-normal font-sans">
+                          💡 <b>Dica de IA:</b> Cole seu extrato bancário semanal ou mensal na guia <b>Conciliação com IA</b> para separar os gastos irregulares de uma vez só.
+                        </div>
+                      </div>
+
+                      <button
+                        id="goto-ai-tab-btn"
+                        onClick={() => { setActiveTab("ai"); setMobileMenuOpen(false); }}
+                        className="w-full text-center py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-bold transition-all cursor-pointer"
+                      >
+                        Ir para Separador com IA
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bento Categories Distribuction */}
+                <CategoryPieChart transactions={transactions} selectedMonth={selectedMonth} />
+              </div>
+            )}
+
+            {dashboardSubTab === "forecast" && (
+              <ForecastComparison 
+                transactions={transactions} 
+                selectedMonth={selectedMonth} 
+                onConfirmTransaction={handleConfirmTransaction} 
+              />
+            )}
+
+            {dashboardSubTab === "categories" && (
+              <CategoryChartsView 
+                transactions={transactions} 
+                selectedMonth={selectedMonth} 
+              />
+            )}
           </div>
         )}
 
@@ -1270,6 +1334,7 @@ export default function App() {
               selectedMonth={selectedMonth}
               onSetSelectedMonth={setSelectedMonth}
               onDeleteTransaction={handleDeleteTransaction}
+              onConfirmTransaction={handleConfirmTransaction}
               onEditTransaction={(tx) => {
                 setTransactionToEdit(tx);
                 setIsModalOpen(true);

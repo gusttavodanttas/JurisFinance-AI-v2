@@ -19,6 +19,7 @@ export interface Transaction {
   paymentMethod?: string;
   notes?: string;
   isAiCategorized?: boolean;
+  status?: "PREVISTO" | "REALIZADO";
 }
 
 export interface PriorityBill {

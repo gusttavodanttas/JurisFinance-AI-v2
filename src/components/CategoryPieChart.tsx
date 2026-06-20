@@ -8,10 +8,10 @@ interface CategoryPieChartProps {
 }
 
 export default function CategoryPieChart({ transactions, selectedMonth }: CategoryPieChartProps) {
-  // Filter for expenses in current month
+  // Filter for realized expenses in current month
   const expenses = transactions.filter((t) => {
     const matchesMonth = selectedMonth === "ALL" || t.date.substring(0, 7) === selectedMonth;
-    return matchesMonth && t.type === TransactionType.EXPENSE;
+    return matchesMonth && t.type === TransactionType.EXPENSE && t.status !== "PREVISTO";
   });
 
   // Separate professional list and personal list

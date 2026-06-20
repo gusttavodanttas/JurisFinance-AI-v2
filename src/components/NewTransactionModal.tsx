@@ -24,6 +24,7 @@ interface BulkRow {
   category: string;
   amount: string;
   paymentMethod: string;
+  status: "PREVISTO" | "REALIZADO";
 }
 
 export default function NewTransactionModal({ 
@@ -46,6 +47,7 @@ export default function NewTransactionModal({
   const [paymentMethod, setPaymentMethod] = useState("PIX");
   const [notes, setNotes] = useState("");
   const [isMixedIncident, setIsMixedIncident] = useState(false);
+  const [status, setStatus] = useState<"PREVISTO" | "REALIZADO">("REALIZADO");
 
   // Bulk form state (prefilled with 3 empty rows)
   const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => [
@@ -57,6 +59,7 @@ export default function NewTransactionModal({
       category: "Outras Despesas Profissionais",
       amount: "",
       paymentMethod: "PIX",
+      status: "REALIZADO",
     },
     {
       date: new Date().toISOString().split("T")[0],
@@ -66,6 +69,7 @@ export default function NewTransactionModal({
       category: "Outras Despesas Profissionais",
       amount: "",
       paymentMethod: "PIX",
+      status: "REALIZADO",
     },
     {
       date: new Date().toISOString().split("T")[0],
@@ -75,6 +79,7 @@ export default function NewTransactionModal({
       category: "Outras Despesas Profissionais",
       amount: "",
       paymentMethod: "PIX",
+      status: "REALIZADO",
     }
   ]);
 
@@ -122,6 +127,7 @@ export default function NewTransactionModal({
         setCategory(initialTransaction.category);
         setAmount(initialTransaction.amount.toString());
         setPaymentMethod(initialTransaction.paymentMethod || "PIX");
+        setStatus(initialTransaction.status || "REALIZADO");
         
         let rawNotes = initialTransaction.notes || "";
         if (rawNotes.startsWith("Aviso: Lançado como despesa pessoal paga incorretamente")) {
@@ -139,6 +145,7 @@ export default function NewTransactionModal({
         setPaymentMethod("PIX");
         setNotes("");
         setIsMixedIncident(false);
+        setStatus("REALIZADO");
         
         // Reset bulk rows to fresh defaults
         setBulkRows([
@@ -150,6 +157,7 @@ export default function NewTransactionModal({
             category: "Outras Despesas Profissionais",
             amount: "",
             paymentMethod: "PIX",
+            status: "REALIZADO",
           },
           {
             date: new Date().toISOString().split("T")[0],
@@ -159,6 +167,7 @@ export default function NewTransactionModal({
             category: "Outras Despesas Profissionais",
             amount: "",
             paymentMethod: "PIX",
+            status: "REALIZADO",
           },
           {
             date: new Date().toISOString().split("T")[0],
@@ -168,6 +177,7 @@ export default function NewTransactionModal({
             category: "Outras Despesas Profissionais",
             amount: "",
             paymentMethod: "PIX",
+            status: "REALIZADO",
           }
         ]);
       }
@@ -196,7 +206,8 @@ export default function NewTransactionModal({
         amount: parseFloat(amount),
         paymentMethod,
         notes: actualNotes,
-        isAiCategorized: isMixedIncident
+        isAiCategorized: isMixedIncident,
+        status
       });
     } else {
       onSave({
@@ -208,7 +219,8 @@ export default function NewTransactionModal({
         amount: parseFloat(amount),
         paymentMethod,
         notes: actualNotes,
-        isAiCategorized: isMixedIncident
+        isAiCategorized: isMixedIncident,
+        status
       });
     }
 
@@ -233,6 +245,7 @@ export default function NewTransactionModal({
         category: "Outras Despesas Profissionais",
         amount: "",
         paymentMethod: "PIX",
+        status: "REALIZADO",
       }
     ]);
   };
@@ -292,7 +305,8 @@ export default function NewTransactionModal({
       amount: parseFloat(row.amount),
       paymentMethod: row.paymentMethod || "PIX",
       notes: "Lançamento em Lote Rápido",
-      isAiCategorized: false
+      isAiCategorized: false,
+      status: row.status
     }));
 
     if (onSaveBulk) {
@@ -449,6 +463,37 @@ export default function NewTransactionModal({
               </div>
             </div>
 
+            {/* Status Selector */}
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-500">Status do Lançamento</label>
+              <div className="flex gap-1.5 bg-slate-100 p-1 rounded-lg font-sans">
+                <button
+                  type="button"
+                  onClick={() => setStatus("REALIZADO")}
+                  className={`w-full text-center py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    status === "REALIZADO"
+                      ? type === TransactionType.REVENUE 
+                        ? "bg-[#10b981] text-white shadow-xs" 
+                        : "bg-rose-600 text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {type === TransactionType.REVENUE ? "Confirmado (Recebido)" : "Confirmado (Pago)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatus("PREVISTO")}
+                  className={`w-full text-center py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    status === "PREVISTO"
+                      ? "bg-amber-500 text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-700"
+                  }`}
+                >
+                  {type === TransactionType.REVENUE ? "Previsto (A receber)" : "Previsto (A pagar)"}
+                </button>
+              </div>
+            </div>
+
             {/* Description */}
             <div className="space-y-1">
               <label htmlFor="tx-description" className="block text-xs font-bold text-slate-500">Descrição Comercial / Histórico</label>
@@ -559,16 +604,17 @@ export default function NewTransactionModal({
             </div>
 
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50">
-              <table className="w-full text-xs text-left">
+              <table className="w-full text-xs text-left font-sans">
                 <thead className="bg-slate-100 border-b border-slate-200 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                   <tr>
-                    <th className="p-2.5 w-[14%]">Data</th>
-                    <th className="p-2.5 w-[24%]">Descrição Comercial</th>
-                    <th className="p-2.5 w-[12%]">Escopo</th>
-                    <th className="p-2.5 w-[12%]">Fluxo</th>
+                    <th className="p-2.5 w-[12%]">Data</th>
+                    <th className="p-2.5 w-[20%]">Descrição Comercial</th>
+                    <th className="p-2.5 w-[11%]">Escopo</th>
+                    <th className="p-2.5 w-[11%]">Fluxo</th>
                     <th className="p-2.5 w-[16%]">Categoria</th>
-                    <th className="p-2.5 w-[12%]">Valor (R$)</th>
-                    <th className="p-2.5 w-[10%] text-center">Ações</th>
+                    <th className="p-2.5 w-[11%]">Valor (R$)</th>
+                    <th className="p-2.5 w-[11%]">Status</th>
+                    <th className="p-2.5 w-[8%] text-center">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -650,6 +696,20 @@ export default function NewTransactionModal({
                             value={row.amount}
                             onChange={(e) => handleUpdateBulkRow(index, "amount", e.target.value)}
                           />
+                        </td>
+
+                        {/* Status */}
+                        <td className="p-2">
+                          <select
+                            className={`w-full bg-white border border-slate-200 rounded p-1 text-xs font-semibold focus:outline-hidden ${
+                              row.status === "PREVISTO" ? "text-amber-600 font-bold" : "text-slate-700"
+                            }`}
+                            value={row.status}
+                            onChange={(e) => handleUpdateBulkRow(index, "status", e.target.value as "PREVISTO" | "REALIZADO")}
+                          >
+                            <option value="REALIZADO">Realizado</option>
+                            <option value="PREVISTO">Previsto</option>
+                          </select>
                         </td>
 
                         {/* Action - Delete row */}
