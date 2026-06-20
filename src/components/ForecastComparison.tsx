@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { 
   BarChart, 
   Bar, 
@@ -83,6 +83,36 @@ export default function ForecastComparison({
   const pendingTransactions = useMemo(() => {
     return monthTransactions.filter((t) => t.status === "PREVISTO");
   }, [monthTransactions]);
+
+  const [catScope, setCatScope] = useState<TransactionScope>(TransactionScope.PROFESSIONAL);
+
+  const categoryStats = useMemo(() => {
+    const previstoMap: Record<string, number> = {};
+    const realizadoMap: Record<string, number> = {};
+    const categoriesSet = new Set<string>();
+
+    monthTransactions
+      .filter((t) => t.scope === catScope)
+      .forEach((t) => {
+        categoriesSet.add(t.category);
+        previstoMap[t.category] = (previstoMap[t.category] || 0) + t.amount;
+        if (t.status !== "PREVISTO") {
+          realizadoMap[t.category] = (realizadoMap[t.category] || 0) + t.amount;
+        }
+      });
+
+    return Array.from(categoriesSet).map((cat) => {
+      const prev = previstoMap[cat] || 0;
+      const real = realizadoMap[cat] || 0;
+      return {
+        name: cat,
+        Previsto: prev,
+        Realizado: real,
+        Desvio: prev - real,
+        Progresso: prev > 0 ? (real / prev) * 100 : 0
+      };
+    }).sort((a, b) => b.Previsto - a.Previsto);
+  }, [monthTransactions, catScope]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -232,7 +262,7 @@ export default function ForecastComparison({
       {/* Comparison Chart */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs text-left">
         <div className="mb-4">
-          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
+          <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 font-sans">
             <Calendar className="w-4 h-4 text-indigo-500" />
             Análise Orçamentária - {getMonthTitle()}
           </h3>
@@ -286,6 +316,107 @@ export default function ForecastComparison({
             </ResponsiveContainer>
           )}
         </div>
+      </div>
+
+      {/* Category Level Comparison */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-3xs text-left font-sans space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5 font-sans">
+              <Landmark className="w-4 h-4 text-indigo-500" />
+              Comparativo de Categorias: Previsto x Realizado
+            </h3>
+            <p className="text-[11px] text-slate-400 font-medium">Análise detalhada por categoria contábil para o escopo selecionado</p>
+          </div>
+          
+          {/* Scope selector */}
+          <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+            <button
+              type="button"
+              onClick={() => setCatScope(TransactionScope.PROFESSIONAL)}
+              className={`py-1 px-2.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                catScope === TransactionScope.PROFESSIONAL
+                  ? "bg-white text-indigo-700 shadow-xs"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Escritório (PJ)
+            </button>
+            <button
+              type="button"
+              onClick={() => setCatScope(TransactionScope.PERSONAL)}
+              className={`py-1 px-2.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                catScope === TransactionScope.PERSONAL
+                  ? "bg-white text-violet-700 shadow-xs"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Pessoal (PF)
+            </button>
+          </div>
+        </div>
+
+        {/* Category Chart & Table */}
+        {categoryStats.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs font-medium">
+            Sem lançamentos de categorias para comparar neste período.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Chart */}
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={categoryStats}
+                  layout="vertical"
+                  margin={{ left: 15, right: 10, top: 10, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" fontSize={9} tickLine={false} axisLine={false} />
+                  <YAxis 
+                    dataKey="name" 
+                    type="category" 
+                    width={90} 
+                    fontSize={9} 
+                    tickLine={false} 
+                    axisLine={false} 
+                    tickFormatter={(v) => v.substring(0, 15)} 
+                  />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 9 }} />
+                  <Bar dataKey="Previsto" fill="#c7d2fe" radius={[0, 4, 4, 0]} maxBarSize={12} />
+                  <Bar dataKey="Realizado" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={12} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Table list */}
+            <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
+              {categoryStats.map((item) => (
+                <div key={item.name} className="p-2 bg-slate-50/50 rounded-lg border border-slate-100 text-xs space-y-1">
+                  <div className="flex justify-between font-semibold text-slate-800">
+                    <span className="truncate max-w-[60%]">{item.name}</span>
+                    <span className="text-[10px] text-slate-500 font-mono">
+                      {formatCurrency(item.Realizado)} / {formatCurrency(item.Previsto)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        catScope === TransactionScope.PROFESSIONAL ? "bg-indigo-600" : "bg-violet-600"
+                      }`}
+                      style={{ width: `${Math.min(item.Progresso, 100)}%` }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-[9px] text-slate-400 font-medium">
+                    <span>Progresso: {item.Progresso.toFixed(0)}%</span>
+                    <span>Pendente: {formatCurrency(item.Desvio)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Pending / Forecasted Transactions Reconciliation List */}

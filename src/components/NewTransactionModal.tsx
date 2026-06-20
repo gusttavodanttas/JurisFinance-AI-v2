@@ -269,6 +269,11 @@ export default function NewTransactionModal({
         const nextType = key === "type" ? value : row.type;
         const list = ALL_CATEGORIES_MAP[`${nextScope}_${nextType}`] || [];
         row.category = list[0] || "";
+        
+        // Also default status based on Type
+        if (key === "type") {
+          row.status = value === TransactionType.REVENUE ? "PREVISTO" : "REALIZADO";
+        }
       }
 
       updated[index] = row;
@@ -409,7 +414,10 @@ export default function NewTransactionModal({
                 <div className="flex gap-1.5 bg-slate-100 p-1 rounded-lg">
                   <button
                     type="button"
-                    onClick={() => setType(TransactionType.EXPENSE)}
+                    onClick={() => {
+                      setType(TransactionType.EXPENSE);
+                      setStatus("REALIZADO");
+                    }}
                     className={`w-full text-center py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                       type === TransactionType.EXPENSE
                         ? "bg-white text-rose-700 shadow-xs"
@@ -420,7 +428,10 @@ export default function NewTransactionModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setType(TransactionType.REVENUE)}
+                    onClick={() => {
+                      setType(TransactionType.REVENUE);
+                      setStatus("PREVISTO");
+                    }}
                     className={`w-full text-center py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                       type === TransactionType.REVENUE
                         ? "bg-white text-[#10b981] shadow-xs"
