@@ -44,10 +44,42 @@ body {
 }
 
 @media print {
-  /* Print helper to ensure clean reports */
-  body {
-    background: white;
-    color: black;
+  /* Hide non-printable app UI elements */
+  aside,
+  header,
+  #mobile-menu-toggle,
+  #report-month-navigation,
+  #print-report-btn,
+  #monthly-reporting-widget > div:first-of-type,
+  #view-report-container > div:first-of-type,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body, html {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    height: auto !important;
+    width: 100% !important;
+  }
+
+  /* Main printable content layout */
+  #printable-report {
+    padding: 0 !important;
+    margin: 0 !important;
+    border: none !important;
+    width: 100% !important;
+  }
+
+  /* Map the custom printing class helpers used in JSX */
+  .printing\:flex {
+    display: flex !important;
+  }
+  
+  .printing\:p-8 {
+    padding: 2rem !important;
   }
 }
 
