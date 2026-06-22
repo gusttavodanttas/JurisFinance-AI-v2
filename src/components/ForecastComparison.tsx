@@ -376,11 +376,11 @@ export default function ForecastComparison({
                   <YAxis 
                     dataKey="name" 
                     type="category" 
-                    width={90} 
+                    width={140} 
                     fontSize={9} 
                     tickLine={false} 
                     axisLine={false} 
-                    tickFormatter={(v) => v.substring(0, 15)} 
+                    tickFormatter={(v) => v.substring(0, 25)} 
                   />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 9 }} />

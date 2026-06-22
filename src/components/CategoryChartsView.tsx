@@ -155,7 +155,7 @@ export default function CategoryChartsView({ transactions, selectedMonth }: Cate
               <BarChart data={dataList} layout="vertical" margin={{ left: 15, right: 10, top: 10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                 <XAxis type="number" fontSize={9} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" width={90} fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => v.substring(0, 15)} />
+                <YAxis dataKey="name" type="category" width={140} fontSize={9} tickLine={false} axisLine={false} tickFormatter={(v) => v.substring(0, 25)} />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={20}>
                   {dataList.map((entry, index) => (
