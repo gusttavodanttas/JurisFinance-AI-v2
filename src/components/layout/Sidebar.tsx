@@ -2,7 +2,7 @@ import React from "react";
 import {
   Scale, LayoutDashboard, Sparkles, FileSpreadsheet, Briefcase,
   Target, FileCheck2, MessageSquare, UserCheck, Edit3,
-  Users, TrendingUp, BarChart3, Gavel,
+  Users, TrendingUp, BarChart3, Gavel, Settings,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
@@ -99,6 +99,14 @@ export default function Sidebar() {
         {navItem("nav-tab-custas", "custas",
           <Gavel className={`w-4 h-4 ${activeTab === "custas" ? "scale-110 text-rose-400" : "text-slate-400"}`} />,
           "Custas & Reembolsos", "from-rose-950/40 to-slate-900/30", "border-rose-500")}
+
+        <div className="pt-2 pb-1">
+          <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest font-mono px-3.5">Sistema</p>
+        </div>
+
+        {navItem("nav-tab-settings", "settings",
+          <Settings className={`w-4 h-4 ${activeTab === "settings" ? "scale-110 text-slate-300" : "text-slate-500"}`} />,
+          "Configurações", "from-slate-800/60 to-slate-900/30", "border-slate-500")}
       </nav>
 
       <div className="mt-auto border-t border-slate-800 pt-3 text-[10px] text-slate-500 space-y-2.5">

@@ -360,47 +360,54 @@ export default function TransactionList({
       </div>
 
       {/* DEDICATED QUICK HELP & ACTIONS STRIP */}
-      <div id="ledger-quick-actions-bar" className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-3 bg-indigo-50/50 rounded-lg border border-indigo-200/40 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-          <span className="text-[11px] text-slate-600 font-medium">
-            Mostrando <strong className="text-indigo-950 font-bold">{filteredTransactions.length}</strong> de <strong className="text-slate-800">{transactions.length}</strong> lançamentos escriturados.
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
+      <div id="ledger-quick-actions-bar" className="flex flex-col gap-2 p-3 bg-indigo-50/50 rounded-lg border border-indigo-200/40 mb-4">
+        {/* Row 1: count + primary action */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse shrink-0"></span>
+            <span className="text-[11px] text-slate-600 font-medium">
+              <strong className="text-indigo-950">{filteredTransactions.length}</strong>
+              <span className="hidden sm:inline"> de <strong className="text-slate-800">{transactions.length}</strong> lançamentos</span>
+            </span>
+          </div>
           {onTriggerNewTransaction && (
             <button
               id="ledger-direct-add-btn"
               onClick={onTriggerNewTransaction}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white text-[11px] font-bold rounded-md transition-all shadow-xs cursor-pointer select-none"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563eb] hover:bg-blue-700 text-white text-[11px] font-bold rounded-md transition-all shadow-xs cursor-pointer select-none shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              Lançar Movimentação
+              <span className="hidden sm:inline">Lançar Movimentação</span>
+              <span className="sm:hidden">Lançar</span>
             </button>
           )}
+        </div>
+        {/* Row 2: filter + data tools — scrollable on mobile */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
           <button
             onClick={() => setShowUnreconciled(v => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none ${showUnreconciled ? "bg-teal-600 text-white border-teal-600" : "bg-white hover:bg-teal-50 text-slate-500 hover:text-teal-700 border-slate-200 hover:border-teal-200"}`}
-            title="Mostrar apenas lançamentos não conciliados"
+            className={`flex items-center gap-1 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none shrink-0 ${showUnreconciled ? "bg-teal-600 text-white border-teal-600" : "bg-white hover:bg-teal-50 text-slate-500 hover:text-teal-700 border-slate-200 hover:border-teal-200"}`}
+            title="Não conciliados"
           >
             <CheckCheck className="w-3.5 h-3.5" />
-            {showUnreconciled ? "Não conciliados" : "Não conciliado"}
+            <span className="hidden sm:inline">{showUnreconciled ? "Não conciliados" : "Não conciliado"}</span>
           </button>
           <button
             onClick={() => setShowBalance(v => !v)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none ${showBalance ? "bg-indigo-600 text-white border-indigo-600" : "bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-200 hover:border-indigo-200"}`}
-            title="Exibir coluna de saldo acumulado"
+            className={`flex items-center gap-1 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none shrink-0 ${showBalance ? "bg-indigo-600 text-white border-indigo-600" : "bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-200 hover:border-indigo-200"}`}
+            title="Saldo acumulado"
           >
-            Saldo Acum.
+            <span>Saldo Acum.</span>
           </button>
+          <div className="w-px h-4 bg-slate-200 shrink-0" />
           <button
             onClick={() => exportToCSV(filteredTransactions, `lancamentos-${new Date().toISOString().slice(0,10)}.csv`)}
             disabled={filteredTransactions.length === 0}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Exportar lançamentos filtrados para CSV"
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            title="Exportar CSV"
           >
             <Download className="w-3.5 h-3.5" />
-            Exportar CSV
+            <span className="hidden sm:inline">Exportar CSV</span>
           </button>
           {onImportTransactions && (
             <>
@@ -408,11 +415,11 @@ export default function TransactionList({
                 onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); e.target.value = ""; }} />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-700 border border-slate-200 hover:border-blue-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none"
-                title="Importar extrato bancário em CSV"
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-700 border border-slate-200 hover:border-blue-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none shrink-0"
+                title="Importar CSV"
               >
                 <Upload className="w-3.5 h-3.5" />
-                Importar CSV
+                <span className="hidden sm:inline">Importar CSV</span>
               </button>
             </>
           )}
@@ -420,8 +427,8 @@ export default function TransactionList({
             <button
               id="ledger-direct-clear-btn"
               onClick={onClearAllTransactions}
-              className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none"
-              title="Limpar todos os lançamentos cadastrados para começar do zero"
+              className="px-2.5 py-1.5 bg-white hover:bg-red-50 text-slate-500 hover:text-red-600 border border-slate-200 hover:border-red-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none shrink-0"
+              title="Excluir todos os lançamentos"
             >
               Excluir Tudo
             </button>

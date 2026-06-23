@@ -3,7 +3,7 @@ import { Transaction, TransactionScope, TransactionType, PriorityBill, Client, C
 import { INITIAL_TRANSACTIONS, INITIAL_PRIORITY_BILLS } from "../mockData";
 import { useCloudSync } from "../hooks/useCloudSync";
 
-type ActiveTab = "dashboard" | "ai" | "ledger" | "priorities" | "report" | "whatsapp" | "metas" | "users" | "clients" | "cashflow90" | "dre" | "custas";
+type ActiveTab = "dashboard" | "ai" | "ledger" | "priorities" | "report" | "whatsapp" | "metas" | "users" | "clients" | "cashflow90" | "dre" | "custas" | "settings";
 type SyncStatus = "synced" | "syncing" | "error" | "offline";
 type DashboardSubTab = "overview" | "forecast" | "categories";
 

@@ -22,6 +22,7 @@ const ClientsTab = lazy(() => import("../ClientsTab"));
 const CashFlow90DaysTab = lazy(() => import("../CashFlow90DaysTab"));
 const DRETab = lazy(() => import("../DRETab"));
 const CourtCostsTab = lazy(() => import("../CourtCostsTab"));
+const SettingsTab = lazy(() => import("../SettingsTab"));
 
 function TabFallback() {
   return (
@@ -55,11 +56,9 @@ const PT_MONTHS_LONG = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","J
 
 function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border-l-4 border-indigo-600 pl-3">
-      <div>
-        <h2 className="text-xl font-bold tracking-tight text-slate-900">{title}</h2>
-        <p className="text-xs text-slate-500">{subtitle}</p>
-      </div>
+    <div className="border-l-4 border-indigo-600 pl-3">
+      <h2 className="text-base md:text-xl font-bold tracking-tight text-slate-900 leading-tight">{title}</h2>
+      <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
     </div>
   );
 }
@@ -110,7 +109,7 @@ export default function MainContent() {
   [priorityBills, targetMonth]);
 
   return (
-    <main className="flex-grow p-4 lg:p-6 space-y-6 relative">
+    <main className="flex-grow p-3 md:p-4 lg:p-6 space-y-4 md:space-y-6 relative min-w-0 overflow-x-hidden">
       {isLoadingCloud && (
         <div className="absolute inset-0 bg-slate-50/70 backdrop-blur-xs z-50 flex flex-col items-center justify-center space-y-3 py-20 rounded-xl">
           <div className="w-10 h-10 border-4 border-violet-500/35 border-t-violet-600 rounded-full animate-spin"></div>
@@ -121,14 +120,16 @@ export default function MainContent() {
       {/* DASHBOARD */}
       {activeTab === "dashboard" && (
         <div className="space-y-6">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-2 border-l-4 border-indigo-600 pl-3">
-            <div>
-              <h2 className="text-xl font-bold tracking-tight text-slate-900">Demonstrativo de Integração PJ/PF</h2>
-              <p className="text-xs text-slate-500">Separador inteligente e monitor de mistura patrimonial para advogados titulares</p>
+          <div className="border-l-4 border-indigo-600 pl-3">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h2 className="text-base md:text-xl font-bold tracking-tight text-slate-900 leading-tight">Demonstrativo de Integração PJ/PF</h2>
+                <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">Separador inteligente e monitor de mistura patrimonial</p>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono italic shrink-0 hidden md:block">
+                {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </span>
             </div>
-            <span className="text-[10px] text-slate-400 font-mono italic">
-              Atualizado hoje às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-            </span>
           </div>
 
           <div className="flex border-b border-slate-200 pb-0.5 overflow-x-auto scrollbar-none font-sans gap-2">
@@ -347,6 +348,14 @@ export default function MainContent() {
           <div className="space-y-6">
             <SectionHeader title="Custas & Reembolsos Processuais" subtitle="Controle de custas pagas e reembolsos pendentes por cliente/processo" />
             <CourtCostsTab courtCosts={courtCosts} onAdd={handleAddCourtCost} onUpdate={handleUpdateCourtCost} onDelete={handleDeleteCourtCost} />
+          </div>
+        )}
+
+        {/* SETTINGS */}
+        {activeTab === "settings" && (
+          <div className="space-y-6">
+            <SectionHeader title="Configurações" subtitle="Gerencie categorias, perfil e preferências do sistema" />
+            <SettingsTab />
           </div>
         )}
       </Suspense>
