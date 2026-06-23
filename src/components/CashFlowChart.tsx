@@ -1,33 +1,41 @@
 import React, { useState } from "react";
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  Legend, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
   ResponsiveContainer,
   AreaChart,
   Area,
   ReferenceLine
 } from "recharts";
-import { Transaction, TransactionScope, TransactionType } from "../types";
-import { Calendar, Briefcase, User } from "lucide-react";
+import { Transaction, TransactionScope, TransactionType, PriorityBill } from "../types";
+import { Calendar, Briefcase, User, TrendingUp } from "lucide-react";
 
 interface CashFlowChartProps {
   transactions: Transaction[];
+  priorityBills?: PriorityBill[];
 }
 
-export default function CashFlowChart({ transactions }: CashFlowChartProps) {
+export default function CashFlowChart({ transactions, priorityBills = [] }: CashFlowChartProps) {
   const [activeTab, setActiveTab] = useState<"professional" | "comparison">("professional");
 
-  // Group transactions by month
-  // We'll extract unique months and sort them
+  // Collect all months: from transactions + future bill months
   const monthsSet = new Set<string>();
-  transactions.forEach((t) => {
-    monthsSet.add(t.date.substring(0, 7)); // "YYYY-MM"
-  });
+  transactions.forEach((t) => monthsSet.add(t.date.substring(0, 7)));
+  // Add next 2 months beyond the latest transaction month for projection
+  const sortedTxMonths = Array.from(monthsSet).sort();
+  const latestMonth = sortedTxMonths[sortedTxMonths.length - 1] || new Date().toISOString().substring(0, 7);
+  for (let i = 1; i <= 2; i++) {
+    const [y, m] = latestMonth.split("-").map(Number);
+    const d = new Date(y, m - 1 + i, 1);
+    monthsSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  // Also add any bill months already registered
+  priorityBills.forEach(b => { if (b.month) monthsSet.add(b.month); });
 
   const sortedMonths = Array.from(monthsSet).sort();
 
@@ -47,9 +55,11 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
     "2026-12": "Dez/26",
   };
 
+  const today = new Date().toISOString().substring(0, 7);
+
   const finalData = sortedMonths.map((m) => {
+    const isProjected = m > today;
     const allMonthTx = transactions.filter((t) => t.date.substring(0, 7) === m);
-    const realizedTx = allMonthTx.filter((t) => t.status !== "PREVISTO");
 
     let profRevenue = 0, profRevenuePrev = 0;
     let profExpense = 0, profExpensePrev = 0;
@@ -69,6 +79,14 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
       }
     });
 
+    // For projected months, add PAGAR bills as projected expenses
+    if (isProjected) {
+      priorityBills.filter(b => b.month === m && !b.paid && b.status === "PAGAR").forEach(b => {
+        if (b.scope === TransactionScope.PROFESSIONAL) profExpensePrev += b.amount;
+        else persExpensePrev += b.amount;
+      });
+    }
+
     const totalProfRev = profRevenue + profRevenuePrev;
     const totalProfExp = profExpense + profExpensePrev;
     const totalPersRev = persRevenue + persRevenuePrev;
@@ -76,7 +94,8 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
 
     return {
       monthKey: m,
-      name: monthLabels[m] || m,
+      name: (monthLabels[m] || m) + (isProjected ? " ↗" : ""),
+      isProjected,
       "Faturamento (Receita PJ)": profRevenue,
       "Previsto (Receita PJ)": profRevenuePrev,
       "Gastos Profissionais (Despesa PJ)": profExpense,
@@ -126,7 +145,14 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
         <div>
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Consolidado Financeiro</span>
-          <h3 className="text-sm font-bold text-[#1e293b]">Evolução do Fluxo de Caixa</h3>
+          <h3 className="text-sm font-bold text-[#1e293b] flex items-center gap-2">
+            Evolução do Fluxo de Caixa
+            {finalData.some(d => d.isProjected) && (
+              <span className="flex items-center gap-1 text-[9px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                <TrendingUp className="w-2.5 h-2.5" /> inclui projeção
+              </span>
+            )}
+          </h3>
         </div>
  
         {/* Chart View Switcher Tabs */}

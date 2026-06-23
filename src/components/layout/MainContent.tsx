@@ -21,8 +21,28 @@ const CloudUsersTab = lazy(() => import("../CloudUsersTab"));
 
 function TabFallback() {
   return (
-    <div className="flex items-center justify-center py-24">
-      <div className="w-8 h-8 border-4 border-violet-500/35 border-t-violet-600 rounded-full animate-spin" />
+    <div className="space-y-4 animate-pulse">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-2xl border border-slate-100 p-5 h-32">
+            <div className="h-2.5 bg-slate-100 rounded w-1/2 mb-3" />
+            <div className="h-7 bg-slate-100 rounded w-2/3 mb-2" />
+            <div className="h-2 bg-slate-100 rounded w-3/4" />
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-2xl border border-slate-100 p-5 h-56">
+        <div className="h-2.5 bg-slate-100 rounded w-1/4 mb-4" />
+        <div className="space-y-2.5">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="h-2 bg-slate-100 rounded w-16" />
+              <div className="h-2 bg-slate-100 rounded flex-1" />
+              <div className="h-2 bg-slate-100 rounded w-20" />
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -128,7 +148,7 @@ export default function MainContent() {
               <DashboardStats transactions={transactionsWithBills} selectedMonth={selectedMonth} />
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="xl:col-span-2">
-                  <CashFlowChart transactions={transactionsWithBills} />
+                  <CashFlowChart transactions={transactionsWithBills} priorityBills={priorityBills} />
                 </div>
                 <div className="xl:col-span-1">
                   <div className="bg-slate-900 text-white rounded-xl border border-slate-800 p-5 shadow-xs space-y-4 flex flex-col justify-between h-full min-h-[340px]">
@@ -201,7 +221,12 @@ export default function MainContent() {
               onConfirmTransaction={handleConfirmTransaction}
               onEditTransaction={(tx) => { setTransactionToEdit(tx); setIsModalOpen(true); }}
               onTriggerNewTransaction={() => { setTransactionToEdit(null); setIsModalOpen(true); }}
-              onClearAllTransactions={handleClearLedger}
+              onClearAllTransactions={() => setConfirmModal({
+                isOpen: true,
+                title: "Excluir todos os lançamentos?",
+                message: "Esta ação é irreversível. Todos os lançamentos do Livro Caixa serão removidos permanentemente. Os dados da Priorização não serão afetados.",
+                onConfirm: handleClearLedger,
+              })}
             />
           </div>
         )}

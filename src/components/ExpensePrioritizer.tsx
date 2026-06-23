@@ -49,6 +49,17 @@ export default function ExpensePrioritizer({
   const [payMethodVal, setPayMethodVal] = useState<string>("");
   const [confirmingBillId, setConfirmingBillId] = useState<string | null>(null);
 
+  const getDueDateStatus = (bill: PriorityBill) => {
+    if (!bill.dueDay || !bill.month) return null;
+    const dueDate = new Date(`${bill.month}-${String(bill.dueDay).padStart(2, "0")}`);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((dueDate.getTime() - today.getTime()) / 86400000);
+    if (diffDays < 0) return { label: `Vencido há ${Math.abs(diffDays)}d`, cls: "bg-red-100 text-red-700 border-red-200" };
+    if (diffDays === 0) return { label: "Vence hoje!", cls: "bg-red-100 text-red-700 border-red-200" };
+    if (diffDays <= 3) return { label: `Vence em ${diffDays}d`, cls: "bg-amber-100 text-amber-700 border-amber-200" };
+    return { label: `Dia ${bill.dueDay}`, cls: "bg-slate-100 text-slate-500 border-slate-200" };
+  };
+
   // ── Settings state ──────────────────────────────────────────────────────────
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"groups" | "categories">("groups");
@@ -633,6 +644,11 @@ export default function ExpensePrioritizer({
                               <div className="truncate">
                                 <span className="font-bold text-slate-800 block truncate" title={b.description}>{b.description}</span>
                                 {b.notes && <p className="text-[10px] text-slate-400 mt-0.5">{b.notes}</p>}
+                                {getDueDateStatus(b) && (
+                                  <span className={`inline-block mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded border ${getDueDateStatus(b)!.cls}`}>
+                                    📅 {getDueDateStatus(b)!.label}
+                                  </span>
+                                )}
                                 <div className="mt-1">{renderCategorySelect(b, "max-w-[170px] truncate")}</div>
                               </div>
                             </div>
@@ -686,6 +702,11 @@ export default function ExpensePrioritizer({
                             <div className="space-y-1">
                               <h4 className="font-bold text-slate-800 text-xs leading-snug">{b.description}</h4>
                               {b.notes && <p className="text-[10px] text-slate-500 bg-slate-50 p-2 rounded border border-slate-100">{b.notes}</p>}
+                              {getDueDateStatus(b) && (
+                                <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded border ${getDueDateStatus(b)!.cls}`}>
+                                  📅 {getDueDateStatus(b)!.label}
+                                </span>
+                              )}
                               <div className="mt-1">{renderCategorySelect(b, "max-w-full")}</div>
                             </div>
                             <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">

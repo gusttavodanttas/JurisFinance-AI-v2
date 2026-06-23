@@ -1,18 +1,26 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Transaction, TransactionScope, TransactionType } from "../types";
-import { 
-  Sparkles, 
-  HelpCircle, 
-  ArrowRight, 
-  Loader2, 
-  CheckCircle2, 
-  Trash2, 
-  Plus, 
+import {
+  Sparkles,
+  ArrowRight,
+  Loader2,
+  CheckCircle2,
+  Trash2,
   Clipboard,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  History,
+  ChevronDown
 } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
+
+interface ConciliationRecord {
+  date: string;
+  count: number;
+  avgConfidence: number;
+}
+
+const HISTORY_KEY = "ai_conciliation_history";
 
 interface AISeparatorProps {
   onAddTransactions: (newTransactions: Omit<Transaction, "id">[]) => void;
@@ -37,6 +45,15 @@ export default function AISeparator({ onAddTransactions }: AISeparatorProps) {
   const [extractedItems, setExtractedItems] = useState<AIItem[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [successCount, setSuccessCount] = useState<number | null>(null);
+  const [history, setHistory] = useState<ConciliationRecord[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(HISTORY_KEY);
+      if (stored) setHistory(JSON.parse(stored));
+    } catch {}
+  }, []);
 
   const handlePasteSample1 = () => {
     setRawText(
@@ -131,6 +148,14 @@ export default function AISeparator({ onAddTransactions }: AISeparatorProps) {
 
     onAddTransactions(formatted);
     setSuccessCount(selected.length);
+
+    // Save to conciliation history
+    const avgConf = Math.round(selected.reduce((sum, i) => sum + i.confidence, 0) / selected.length);
+    const record: ConciliationRecord = { date: new Date().toISOString(), count: selected.length, avgConfidence: avgConf };
+    const updated = [record, ...history].slice(0, 20);
+    setHistory(updated);
+    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(updated)); } catch {}
+
     setExtractedItems([]);
     setRawText("");
   };
@@ -356,6 +381,41 @@ export default function AISeparator({ onAddTransactions }: AISeparatorProps) {
               Aprovar e Lançar no Livro Caixa
             </button>
           </div>
+        </div>
+      )}
+
+      {/* CONCILIATION HISTORY */}
+      {history.length > 0 && (
+        <div className="mt-4 border-t border-slate-800 pt-4">
+          <button
+            type="button"
+            onClick={() => setShowHistory(h => !h)}
+            className="flex items-center gap-2 text-[10px] font-bold text-slate-400 hover:text-slate-200 uppercase tracking-widest transition-all cursor-pointer"
+          >
+            <History className="w-3.5 h-3.5" />
+            Histórico de Conciliações ({history.length})
+            <ChevronDown className={`w-3 h-3 transition-transform ${showHistory ? "rotate-180" : ""}`} />
+          </button>
+          {showHistory && (
+            <div className="mt-3 space-y-1.5">
+              {history.map((rec, i) => (
+                <div key={i} className="flex items-center justify-between bg-slate-900/60 border border-slate-800 rounded-lg px-3 py-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <span className="text-slate-300 font-mono text-[10px]">
+                      {new Date(rec.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-slate-400 text-[10px]">{rec.count} transações</span>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${rec.avgConfidence >= 90 ? "bg-emerald-500/10 text-emerald-400" : "bg-amber-500/10 text-amber-400"}`}>
+                      {rec.avgConfidence}% confiança
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

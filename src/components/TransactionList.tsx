@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Transaction, TransactionScope, TransactionType, ALL_CATEGORIES_MAP } from "../types";
-import { 
-  Search, 
-  Filter, 
-  Trash2, 
-  TrendingUp, 
-  TrendingDown, 
-  Briefcase, 
-  User, 
-  AlertOctagon, 
+import {
+  Search,
+  Filter,
+  Trash2,
+  TrendingUp,
+  TrendingDown,
+  Briefcase,
+  User,
+  AlertOctagon,
   ChevronRight,
   Sparkles,
   CalendarDays,
@@ -16,9 +16,30 @@ import {
   X,
   Plus,
   Edit3,
-  Check
+  Check,
+  Download
 } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
+
+const exportToCSV = (rows: Transaction[], filename: string) => {
+  const header = ["Data","Tipo","Escopo","Descrição","Categoria","Método","Valor","Status"];
+  const lines = rows.map(t => [
+    t.date.split("-").reverse().join("/"),
+    t.type === TransactionType.REVENUE ? "Receita" : "Despesa",
+    t.scope === TransactionScope.PROFESSIONAL ? "PJ" : "PF",
+    `"${t.description.replace(/"/g,'""')}"`,
+    `"${t.category.replace(/"/g,'""')}"`,
+    t.paymentMethod || "—",
+    t.amount.toFixed(2).replace(".",","),
+    t.status || "REALIZADO",
+  ].join(";"));
+  const csv = [header.join(";"), ...lines].join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+};
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -254,6 +275,15 @@ export default function TransactionList({
               Lançar Movimentação
             </button>
           )}
+          <button
+            onClick={() => exportToCSV(filteredTransactions, `lancamentos-${new Date().toISOString().slice(0,10)}.csv`)}
+            disabled={filteredTransactions.length === 0}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Exportar lançamentos filtrados para CSV"
+          >
+            <Download className="w-3.5 h-3.5" />
+            Exportar CSV
+          </button>
           {onClearAllTransactions && transactions.length > 0 && (
             <button
               id="ledger-direct-clear-btn"
@@ -284,11 +314,25 @@ export default function TransactionList({
           <tbody className="divide-y divide-slate-100 bg-white">
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={7} className="p-10 text-center text-slate-400">
-                  <div className="flex flex-col items-center justify-center gap-1.5">
-                    <AlertOctagon className="w-8 h-8 text-slate-300" />
-                    <p className="font-bold text-slate-500">Nenhuma movimentação localizada</p>
-                    <p className="text-xs">Tente reajustar seus filtros no menu de pesquisa ou redefina os meses.</p>
+                <td colSpan={7} className="p-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center">
+                      <CalendarDays className="w-7 h-7 text-slate-300" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-500 text-sm">Nenhuma movimentação localizada</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {search || scopeFilter !== "ALL" || typeFilter !== "ALL" || categoryFilter !== "ALL"
+                          ? "Tente reajustar os filtros de pesquisa."
+                          : "Nenhum lançamento para este período ainda."}
+                      </p>
+                    </div>
+                    {onTriggerNewTransaction && (
+                      <button onClick={onTriggerNewTransaction}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-sm">
+                        <Plus className="w-3.5 h-3.5" /> Lançar primeira movimentação
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
