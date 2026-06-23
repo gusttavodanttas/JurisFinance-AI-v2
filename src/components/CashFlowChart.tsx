@@ -48,35 +48,45 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
   };
 
   const finalData = sortedMonths.map((m) => {
-    const monthTx = transactions.filter((t) => t.date.substring(0, 7) === m && t.status !== "PREVISTO");
-    
-    let profRevenue = 0;
-    let profExpense = 0;
-    let persRevenue = 0;
-    let persExpense = 0;
+    const allMonthTx = transactions.filter((t) => t.date.substring(0, 7) === m);
+    const realizedTx = allMonthTx.filter((t) => t.status !== "PREVISTO");
 
-    monthTx.forEach((t) => {
-      const isRevenue = t.type === TransactionType.REVENUE;
-      const isExpense = t.type === TransactionType.EXPENSE;
+    let profRevenue = 0, profRevenuePrev = 0;
+    let profExpense = 0, profExpensePrev = 0;
+    let persRevenue = 0, persRevenuePrev = 0;
+    let persExpense = 0, persExpensePrev = 0;
 
+    allMonthTx.forEach((t) => {
+      const isPrev = t.status === "PREVISTO";
+      const isRev = t.type === TransactionType.REVENUE;
+      const isExp = t.type === TransactionType.EXPENSE;
       if (t.scope === TransactionScope.PROFESSIONAL) {
-        if (isRevenue) profRevenue += t.amount;
-        if (isExpense) profExpense += t.amount;
+        if (isRev) isPrev ? (profRevenuePrev += t.amount) : (profRevenue += t.amount);
+        if (isExp) isPrev ? (profExpensePrev += t.amount) : (profExpense += t.amount);
       } else {
-        if (isRevenue) persRevenue += t.amount;
-        if (isExpense) persExpense += t.amount;
+        if (isRev) isPrev ? (persRevenuePrev += t.amount) : (persRevenue += t.amount);
+        if (isExp) isPrev ? (persExpensePrev += t.amount) : (persExpense += t.amount);
       }
     });
+
+    const totalProfRev = profRevenue + profRevenuePrev;
+    const totalProfExp = profExpense + profExpensePrev;
+    const totalPersRev = persRevenue + persRevenuePrev;
+    const totalPersExp = persExpense + persExpensePrev;
 
     return {
       monthKey: m,
       name: monthLabels[m] || m,
       "Faturamento (Receita PJ)": profRevenue,
+      "Previsto (Receita PJ)": profRevenuePrev,
       "Gastos Profissionais (Despesa PJ)": profExpense,
-      "Lucro Líquido Escritório": profRevenue - profExpense,
+      "Previsto (Despesa PJ)": profExpensePrev,
+      "Lucro Líquido Escritório": totalProfRev - totalProfExp,
       "Receitas Pessoais (PF)": persRevenue,
+      "Previsto (Receita PF)": persRevenuePrev,
       "Despesas Pessoais (PF)": persExpense,
-      "Saldo Pessoal": persRevenue - persExpense,
+      "Previsto (Despesa PF)": persExpensePrev,
+      "Saldo Pessoal": totalPersRev - totalPersExp,
     };
   });
 
@@ -178,18 +188,10 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: "#f8fafc" }} />
                 <Legend iconType="circle" iconSize={8} wrapperStyle={{ paddingTop: 6, fontSize: 10 }} />
                 
-                <Bar 
-                  dataKey="Faturamento (Receita PJ)" 
-                  fill="#2563eb" 
-                  radius={[3, 3, 0, 0]} 
-                  maxBarSize={30}
-                />
-                <Bar 
-                  dataKey="Gastos Profissionais (Despesa PJ)" 
-                  fill="#ef4444" 
-                  radius={[3, 3, 0, 0]} 
-                  maxBarSize={30}
-                />
+                <Bar dataKey="Faturamento (Receita PJ)" fill="#2563eb" radius={[3,3,0,0]} maxBarSize={28} stackId="rev" />
+                <Bar dataKey="Previsto (Receita PJ)" fill="#93c5fd" radius={[3,3,0,0]} maxBarSize={28} stackId="rev" name="A Receber (Previsto)" />
+                <Bar dataKey="Gastos Profissionais (Despesa PJ)" fill="#ef4444" radius={[3,3,0,0]} maxBarSize={28} stackId="exp" />
+                <Bar dataKey="Previsto (Despesa PJ)" fill="#fca5a5" radius={[3,3,0,0]} maxBarSize={28} stackId="exp" name="A Pagar (Previsto)" />
               </BarChart>
             ) : (
               <AreaChart
@@ -216,24 +218,8 @@ export default function CashFlowChart({ transactions }: CashFlowChartProps) {
                 
                 <ReferenceLine y={0} stroke="#cbd5e1" strokeDasharray="3 3" />
                 
-                <Area 
-                  type="monotone" 
-                  dataKey="Lucro Líquido Escritório" 
-                  name="Lucro Líquido PJ"
-                  stroke="#2563eb" 
-                  fillOpacity={0.06}
-                  fill="url(#colorProf)" 
-                  strokeWidth={1.5}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="Saldo Pessoal" 
-                  name="Sobra de Caixa PF"
-                  stroke="#8b5cf6" 
-                  fillOpacity={0.06}
-                  fill="url(#colorPers)" 
-                  strokeWidth={1.5}
-                />
+                <Area type="monotone" dataKey="Lucro Líquido Escritório" name="Resultado PJ (Prev+Real)" stroke="#2563eb" fillOpacity={0.06} fill="url(#colorProf)" strokeWidth={1.5} />
+                <Area type="monotone" dataKey="Saldo Pessoal" name="Resultado PF (Prev+Real)" stroke="#8b5cf6" fillOpacity={0.06} fill="url(#colorPers)" strokeWidth={1.5} />
                 
                 {/* Gradient definitions */}
                 <defs>

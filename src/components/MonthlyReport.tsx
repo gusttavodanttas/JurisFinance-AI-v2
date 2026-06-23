@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import { Transaction, TransactionScope, TransactionType } from "../types";
 import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, Sparkles, Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface MonthlyReportProps {
   transactions: Transaction[];
@@ -26,27 +27,31 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
   const persRevenues = reportTx.filter(t => t.scope === TransactionScope.PERSONAL && t.type === TransactionType.REVENUE);
   const persExpenses = reportTx.filter(t => t.scope === TransactionScope.PERSONAL && t.type === TransactionType.EXPENSE);
 
-  // Totals
+  // Totals — all (for display in breakdown tables)
   const totalProfRevenue = profRevenues.reduce((acc, t) => acc + t.amount, 0);
   const totalProfExpense = profExpenses.reduce((acc, t) => acc + t.amount, 0);
-  const netProfProfit = totalProfRevenue - totalProfExpense;
-  const profitMargin = totalProfRevenue > 0 ? (netProfProfit / totalProfRevenue) * 100 : 0;
-
   const totalPersRevenue = persRevenues.reduce((acc, t) => acc + t.amount, 0);
   const totalPersExpense = persExpenses.reduce((acc, t) => acc + t.amount, 0);
-  const netPersProfit = totalPersRevenue - totalPersExpense;
+
+  // Realized-only totals — used for liquidity metrics (cash actually received/paid)
+  const realProfRevenue = profRevenues.filter(t => t.status !== "PREVISTO").reduce((acc, t) => acc + t.amount, 0);
+  const realProfExpense = profExpenses.filter(t => t.status !== "PREVISTO").reduce((acc, t) => acc + t.amount, 0);
+  const realPersRevenue = persRevenues.filter(t => t.status !== "PREVISTO").reduce((acc, t) => acc + t.amount, 0);
+  const realPersExpense = persExpenses.filter(t => t.status !== "PREVISTO").reduce((acc, t) => acc + t.amount, 0);
+
+  const netProfProfit = realProfRevenue - realProfExpense;
+  const profitMargin = realProfRevenue > 0 ? (netProfProfit / realProfRevenue) * 100 : 0;
+  const netPersProfit = realPersRevenue - realPersExpense;
+
+  // Count previsto transactions to show warning
+  const previstoProfCount = profRevenues.filter(t => t.status === "PREVISTO").length + profExpenses.filter(t => t.status === "PREVISTO").length;
+  const previstoProfRevTotal = profRevenues.filter(t => t.status === "PREVISTO").reduce((acc, t) => acc + t.amount, 0);
 
   // Let's check how much Personal Expense was mapped (which means mixed in the accounts)
   const mixedPersonalInCorpHopeCount = reportTx
     .filter(t => t.scope === TransactionScope.PERSONAL && t.type === TransactionType.EXPENSE && (t.isAiCategorized || t.notes?.includes("IA") || t.notes?.toLowerCase().includes("escritório") || t.notes?.toLowerCase().includes("pj")))
     .reduce((acc, t) => acc + t.amount, 0);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
-  };
 
   const handlePrint = () => {
     window.print();
@@ -164,14 +169,24 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
           </div>
         </div>
 
+        {/* PREVISTO WARNING BANNER */}
+        {previstoProfCount > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2 text-xs text-amber-800">
+            <TrendingUp className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+            <span>
+              <strong>{previstoProfCount} lançamento{previstoProfCount > 1 ? "s" : ""} em PREVISTO</strong> ({formatCurrency(previstoProfRevTotal)} a receber) não entram nas métricas de liquidez abaixo. As métricas mostram apenas o que foi efetivamente recebido/pago.
+            </span>
+          </div>
+        )}
+
         {/* METRICS ROW */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
             <p className="text-xs text-slate-500 font-medium">Margem Operacional Líquida PJ</p>
             <h4 className="text-xl font-bold text-slate-900 mt-1">{formatCurrency(netProfProfit)}</h4>
-            <div className="flex items-center gap-1 mt-1 text-[10px] text-emerald-600 font-semibold">
+            <div className="flex items-center gap-1 mt-1 text-[10px] font-semibold" style={{ color: profitMargin >= 0 ? '#059669' : '#dc2626' }}>
               <Percent className="w-2.5 h-2.5" />
-              <span>{profitMargin.toFixed(1)}% do faturamento convertido em lucro</span>
+              <span>{realProfRevenue > 0 ? `${profitMargin.toFixed(1)}% do recebido convertido em lucro` : "Nenhuma receita confirmada este mês"}</span>
             </div>
           </div>
 
@@ -246,7 +261,7 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
             Laudo de Integridade Regulatória (Simples Nacional)
           </h4>
           <p className="text-xs text-slate-600 leading-relaxed">
-            Com base nas movimentações de <b>{niceMonthName}</b>, {mixedPersonalInCorpHopeCount > 0 ? (
+            Com base nas movimentações <b>confirmadas (realizadas)</b> de <b>{niceMonthName}</b>, {mixedPersonalInCorpHopeCount > 0 ? (
               <span>
                 foi identificado um total de <b className="text-amber-700">{formatCurrency(mixedPersonalInCorpHopeCount)}</b> da conta particular do sócio transacionadas utilizando recursos do escritório (CNPJ PJ). Para manter a integridade fiscal do escritório sob o <b>Simples Nacional Anexo IV</b> e blindar os sócios contra a desconsideração ordinária de personalidade jurídica (Art. 50 do Código Civil), recomenda-se converter essas saídas em <b>Distribuição de Dividendos Isentos</b> ou estornar à empresa.
               </span>

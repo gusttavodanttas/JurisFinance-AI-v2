@@ -11,6 +11,7 @@ import {
   ArrowDownRight,
   HelpCircle
 } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface CategoryPieChartProps {
   transactions: Transaction[];
@@ -54,13 +55,6 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
   const profStats = sumByGroupAndCategory(profTx);
   const persStats = sumByGroupAndCategory(persTx);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
 
   // Color generator for category lines
   const getProgressColorClass = (index: number, scope: TransactionScope, type: TransactionType) => {
@@ -135,7 +129,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
               </h4>
             </div>
             <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded ${viewType === TransactionType.REVENUE ? "text-emerald-700 bg-emerald-50" : "text-blue-700 bg-blue-50"}`}>
-              Total: {formatCurrency(profStats.total)}
+              Total: {formatCurrency(profStats.total, { maximumFractionDigits: 0 })}
             </span>
           </div>
 
@@ -164,7 +158,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
                     <div className="flex justify-between text-xs font-semibold text-slate-700 font-sans">
                       <span className="truncate max-w-[65%] group-hover:text-indigo-600 transition-colors">{item.category}</span>
                       <span className="text-slate-500 flex-shrink-0 font-mono text-[11px] font-medium">
-                        {formatCurrency(item.amount)} ({item.percentage.toFixed(0)}%)
+                        {formatCurrency(item.amount, { maximumFractionDigits: 0 })} ({item.percentage.toFixed(0)}%)
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -189,7 +183,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
                               <span className="text-[9px] text-slate-400 font-mono mr-1.5">{tx.date.split("-").reverse().slice(0, 2).join("/")}</span>
                               <span className="text-slate-200 font-medium truncate">{tx.description}</span>
                             </div>
-                            <span className={`font-mono font-bold ml-auto shrink-0 ${viewType === TransactionType.REVENUE ? "text-emerald-400" : "text-amber-300"}`}>{formatCurrency(tx.amount)}</span>
+                            <span className={`font-mono font-bold ml-auto shrink-0 ${viewType === TransactionType.REVENUE ? "text-emerald-400" : "text-amber-300"}`}>{formatCurrency(tx.amount, { maximumFractionDigits: 0 })}</span>
                           </div>
                         ))}
                       </div>
@@ -223,7 +217,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
               </h4>
             </div>
             <span className={`text-xs font-mono font-bold px-2.5 py-1 rounded ${viewType === TransactionType.REVENUE ? "text-emerald-700 bg-emerald-50" : "text-violet-700 bg-violet-50"}`}>
-              Total: {formatCurrency(persStats.total)}
+              Total: {formatCurrency(persStats.total, { maximumFractionDigits: 0 })}
             </span>
           </div>
 
@@ -252,7 +246,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
                     <div className="flex justify-between text-xs font-semibold text-slate-700 font-sans">
                       <span className="truncate max-w-[65%] group-hover:text-indigo-600 transition-colors">{item.category}</span>
                       <span className="text-slate-500 flex-shrink-0 font-mono text-[11px] font-medium">
-                        {formatCurrency(item.amount)} ({item.percentage.toFixed(0)}%)
+                        {formatCurrency(item.amount, { maximumFractionDigits: 0 })} ({item.percentage.toFixed(0)}%)
                       </span>
                     </div>
                     <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -277,7 +271,7 @@ export default function CategoryPieChart({ transactions, selectedMonth }: Catego
                               <span className="text-[9px] text-slate-400 font-mono mr-1.5">{tx.date.split("-").reverse().slice(0, 2).join("/")}</span>
                               <span className="text-slate-200 font-medium truncate">{tx.description}</span>
                             </div>
-                            <span className={`font-mono font-bold ml-auto shrink-0 ${viewType === TransactionType.REVENUE ? "text-emerald-400" : "text-amber-300"}`}>{formatCurrency(tx.amount)}</span>
+                            <span className={`font-mono font-bold ml-auto shrink-0 ${viewType === TransactionType.REVENUE ? "text-emerald-400" : "text-amber-300"}`}>{formatCurrency(tx.amount, { maximumFractionDigits: 0 })}</span>
                           </div>
                         ))}
                       </div>

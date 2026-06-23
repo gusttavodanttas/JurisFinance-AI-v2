@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { Transaction, TransactionScope, TransactionType } from "../types";
 import { Calendar, CheckCircle2, AlertCircle, Landmark, Wallet } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface ForecastComparisonProps {
   transactions: Transaction[];
@@ -114,12 +115,6 @@ export default function ForecastComparison({
     }).sort((a, b) => b.Previsto - a.Previsto);
   }, [monthTransactions, catScope]);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
-  };
 
   const getPercentage = (real: number, prev: number) => {
     if (prev === 0) return real > 0 ? 100 : 0;

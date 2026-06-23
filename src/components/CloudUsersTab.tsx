@@ -174,7 +174,7 @@ export default function CloudUsersTab() {
         <div className="space-y-1">
           <p className="font-bold text-slate-800">Segurança de Dados Compartilhada</p>
           <p>
-            O banco de dados Firestore unifica as credenciais do JurisFinance AI entre múltiplos domínios ou navegadores. Qualquer novo advogado que clicar em <b>Criar Conta</b> no site público ou na versão de desenvolvimento será sincronizado instantaneamente na nuvem e aparecerá nesta lista de auditoria com segurança absoluta.
+            O banco de dados Supabase (PostgreSQL) unifica as credenciais do JurisFinance AI entre múltiplos domínios ou navegadores. Qualquer novo advogado que clicar em <b>Criar Conta</b> no site público ou na versão de desenvolvimento será sincronizado instantaneamente na nuvem e aparecerá nesta lista de auditoria com segurança absoluta.
           </p>
         </div>
       </div>

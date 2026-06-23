@@ -12,6 +12,7 @@ import {
   Landmark,
   Wallet
 } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface DashboardStatsProps {
   transactions: Transaction[];
@@ -78,12 +79,6 @@ export default function DashboardStats({ transactions, selectedMonth }: Dashboar
   // Mixing index ratio: Personal expenses paid on office/corporate accounts (realized only)
   const mixingIndex = totalExpensesPaidReal > 0 ? (mixedExpenseTotalReal / totalExpensesPaidReal) * 100 : 0;
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
-  };
 
   const getPercentage = (real: number, prev: number) => {
     if (prev === 0) return real > 0 ? 100 : 0;
@@ -116,45 +111,83 @@ export default function DashboardStats({ transactions, selectedMonth }: Dashboar
       {/* LINHA 1: KPIs EXECUTIVOS DE SALDO (REALIZADO) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         
-        {/* KPI 1: Saldo Real PJ */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-5 shadow-xs relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50/50 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Escritório (PJ)</span>
-            <div className="p-2 bg-blue-50/80 text-[#2563eb] rounded-xl border border-blue-100">
-              <Building2 className="w-4 h-4" />
+        {/* KPI 1: Saldo PJ */}
+        {(() => {
+          const profBalancePrev = pjRevPrev - pjExpPrev;
+          const showPrev = pjRevReal === 0 && pjExpReal === 0 && (pjRevPrev > 0 || pjExpPrev > 0);
+          const displayValue = showPrev ? profBalancePrev : profBalanceReal;
+          return (
+            <div className={`bg-white rounded-2xl border p-5 shadow-xs relative overflow-hidden group ${showPrev ? "border-amber-200" : "border-slate-150"}`}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-blue-50/50 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Escritório (PJ)</span>
+                <div className="flex items-center gap-1.5">
+                  {showPrev && <span className="text-[8px] px-1.5 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded font-bold uppercase tracking-wider">Previsto</span>}
+                  <div className="p-2 bg-blue-50/80 text-[#2563eb] rounded-xl border border-blue-100">
+                    <Building2 className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{showPrev ? "Saldo Previsto (Orçado)" : "Saldo em Caixa Efetivo"}</p>
+                <h3 className={`text-2xl font-black font-display tracking-tight ${displayValue >= 0 ? (showPrev ? "text-amber-600" : "text-blue-600") : "text-rose-600"}`}>
+                  {formatCurrency(displayValue)}
+                </h3>
+              </div>
+              {showPrev ? (
+                <p className="text-[9px] text-amber-600 font-semibold mt-1 font-sans">
+                  Receitas: {formatCurrency(pjRevPrev)} · Despesas: {formatCurrency(pjExpPrev)}
+                </p>
+              ) : (pjRevPrev - pjRevReal) > 0 && (
+                <p className="text-[9px] text-amber-600 font-semibold mt-1 font-sans">
+                  + {formatCurrency(pjRevPrev - pjRevReal)} a receber (previsto)
+                </p>
+              )}
+              <p className="text-[9px] text-slate-400 font-semibold mt-1.5 font-sans leading-none">
+                {showPrev ? "Confirme recebimentos para atualizar o saldo real" : "Saldo real consolidado (Receitas PJ - Custos PJ)"}
+              </p>
             </div>
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saldo em Caixa Efetivo</p>
-            <h3 className={`text-2xl font-black font-display tracking-tight ${profBalanceReal >= 0 ? "text-blue-600" : "text-rose-600"}`}>
-              {formatCurrency(profBalanceReal)}
-            </h3>
-          </div>
-          <p className="text-[9px] text-slate-400 font-semibold mt-2.5 font-sans leading-none">
-            Saldo real consolidado (Receitas PJ - Custos PJ)
-          </p>
-        </div>
+          );
+        })()}
 
-        {/* KPI 2: Saldo Real PF */}
-        <div className="bg-white rounded-2xl border border-slate-150 p-5 shadow-xs relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-violet-50/50 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex items-center justify-between mb-2.5">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Pessoal (PF)</span>
-            <div className="p-2 bg-violet-50/80 text-[#8b5cf6] rounded-xl border border-violet-100">
-              <User className="w-4 h-4" />
+        {/* KPI 2: Saldo PF */}
+        {(() => {
+          const persBalancePrev = pfRevPrev - pfExpPrev;
+          const showPrev = pfRevReal === 0 && pfExpReal === 0 && (pfRevPrev > 0 || pfExpPrev > 0);
+          const displayValue = showPrev ? persBalancePrev : persBalanceReal;
+          return (
+            <div className={`bg-white rounded-2xl border p-5 shadow-xs relative overflow-hidden group ${showPrev ? "border-amber-200" : "border-slate-150"}`}>
+              <div className="absolute top-0 right-0 w-20 h-20 bg-violet-50/50 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Pessoal (PF)</span>
+                <div className="flex items-center gap-1.5">
+                  {showPrev && <span className="text-[8px] px-1.5 py-0.5 bg-amber-100 text-amber-700 border border-amber-200 rounded font-bold uppercase tracking-wider">Previsto</span>}
+                  <div className="p-2 bg-violet-50/80 text-[#8b5cf6] rounded-xl border border-violet-100">
+                    <User className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{showPrev ? "Saldo Previsto (Orçado)" : "Saldo Pessoal Efetivo"}</p>
+                <h3 className={`text-2xl font-black font-display tracking-tight ${displayValue >= 0 ? (showPrev ? "text-amber-600" : "text-slate-900") : "text-rose-600"}`}>
+                  {formatCurrency(displayValue)}
+                </h3>
+              </div>
+              {showPrev ? (
+                <p className="text-[9px] text-amber-600 font-semibold mt-1 font-sans">
+                  Rendimentos: {formatCurrency(pfRevPrev)} · Gastos: {formatCurrency(pfExpPrev)}
+                </p>
+              ) : (pfRevPrev - pfRevReal) > 0 && (
+                <p className="text-[9px] text-amber-600 font-semibold mt-1 font-sans">
+                  + {formatCurrency(pfRevPrev - pfRevReal)} a receber (previsto)
+                </p>
+              )}
+              <p className="text-[9px] text-slate-400 font-semibold mt-1.5 font-sans leading-none">
+                {showPrev ? "Confirme pagamentos para atualizar o saldo real" : "Saldo líquido pessoal (Rendimentos PF - Gastos PF)"}
+              </p>
             </div>
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Saldo Pessoal Efetivo</p>
-            <h3 className={`text-2xl font-black font-display tracking-tight ${persBalanceReal >= 0 ? "text-slate-900" : "text-rose-600"}`}>
-              {formatCurrency(persBalanceReal)}
-            </h3>
-          </div>
-          <p className="text-[9px] text-slate-400 font-semibold mt-2.5 font-sans leading-none">
-            Saldo líquido pessoal (Rendimentos PF - Gastos PF)
-          </p>
-        </div>
+          );
+        })()}
 
         {/* KPI 3: Confusão Patrimonial */}
         <div className="bg-white rounded-2xl border border-slate-150 p-5 shadow-xs relative overflow-hidden group">

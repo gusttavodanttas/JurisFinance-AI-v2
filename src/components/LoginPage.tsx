@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { getFirestoreUser, createFirestoreUser, FirestoreUser } from "../lib/usersDb";
+import { supabase } from "../supabase";
+import { getFirestoreUser } from "../lib/usersDb";
 import { 
   Scale, 
   Eye, 
@@ -50,15 +51,15 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
     setLoading(true);
 
-    // Preconfigured developer account
-    const defaultEmail = "gustavodantas.advogados@gmail.com";
-    const defaultPw = "GD2026";
-    const defaultName = "Dr. Gustavo Dantas";
-    const defaultOab = "OAB/SP 123.456";
+    // Admin account loaded from environment variables
+    const defaultEmail = import.meta.env.VITE_ADMIN_EMAIL ?? "";
+    const defaultPw = import.meta.env.VITE_ADMIN_PASSWORD ?? "";
+    const defaultName = import.meta.env.VITE_ADMIN_NAME ?? "Administrador";
+    const defaultOab = import.meta.env.VITE_ADMIN_OAB ?? "";
 
     try {
       if (authMode === "login") {
-        // 1. Check if matches preconfigured developer account
+        // 1. Admin account — check against env vars (never goes to Supabase Auth)
         if (
           email.toLowerCase().trim() === defaultEmail.toLowerCase().trim() &&
           password === defaultPw
@@ -71,116 +72,89 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           return;
         }
 
-        // 2. Otherwise search in cloud database
-        const userInFirestore = await getFirestoreUser(email);
-        if (userInFirestore) {
-          if (userInFirestore.password === password) {
-            sessionStorage.setItem("gd_auth", "true");
-            sessionStorage.setItem("gd_auth_email", userInFirestore.email);
-            onLogin(userInFirestore.name, userInFirestore.oab);
-            setSuccess(`Bem-vindo de volta, ${userInFirestore.name}!`);
-          } else {
-            setErr("Senha inválida para este e-mail.");
-          }
-        } else {
-          // 3. Fallback check local storage
-          const savedUsers = localStorage.getItem("oab_registered_users");
-          const registeredUsers = savedUsers ? JSON.parse(savedUsers) : [];
-          const matchedLocalUser = registeredUsers.find(
-            (u: any) => u.email.toLowerCase().trim() === email.toLowerCase().trim() && u.password === password
-          );
-
-          if (matchedLocalUser) {
-            // Migrating matching user to Firestore automatically for better cloud experience
-            await createFirestoreUser({
-              name: matchedLocalUser.name,
-              oab: matchedLocalUser.oab,
-              email: matchedLocalUser.email,
-              password: matchedLocalUser.password
-            });
-
-            sessionStorage.setItem("gd_auth", "true");
-            sessionStorage.setItem("gd_auth_email", matchedLocalUser.email);
-            onLogin(matchedLocalUser.name, matchedLocalUser.oab);
-            setSuccess(`Sincronizado na Nuvem! Bem-vindo, ${matchedLocalUser.name}!`);
-          } else {
-            setErr("Este e-mail não foi cadastrado no Banco de Dados.");
-          }
-        }
-      } else {
-        // Registration flow
-        if (!name) {
-          setErr("Por favor, preencha o seu nome completo.");
-          setLoading(false);
-          return;
-        }
-        if (password !== confirmPassword) {
-          setErr("As senhas não coincidem.");
-          setLoading(false);
-          return;
-        }
-        if (password.length < 4) {
-          setErr("A senha deve conter pelo menos 4 caracteres.");
-          setLoading(false);
-          return;
-        }
-
-        if (email.toLowerCase().trim() === defaultEmail.toLowerCase().trim()) {
-          setErr("Este e-mail é reservado para o administrador principal.");
-          setLoading(false);
-          return;
-        }
-
-        // Check if email already registered in cloud database
-        const existingCloudUser = await getFirestoreUser(email);
-        if (existingCloudUser) {
-          setErr("Este endereço de e-mail já está cadastrado no Banco de Dados.");
-          setLoading(false);
-          return;
-        }
-
-        const newUser: FirestoreUser = {
-          name: name.trim(),
-          oab: oab.trim() || `OAB/SP ${Math.floor(100000 + Math.random() * 900000)}`,
+        // 2. All other users — Supabase Auth (passwords hashed, sessions managed by Supabase)
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.toLowerCase().trim(),
-          password: password
-        };
+          password,
+        });
 
-        // Save to cloud
-        const savedToCloud = await createFirestoreUser(newUser);
-
-        // Fallback local storage update
-        const savedUsers = localStorage.getItem("oab_registered_users");
-        const registeredUsers = savedUsers ? JSON.parse(savedUsers) : [];
-        const updatedUsers = [...registeredUsers, {
-          name: newUser.name,
-          oab: newUser.oab,
-          email: newUser.email,
-          password: newUser.password
-        }];
-        localStorage.setItem("oab_registered_users", JSON.stringify(updatedUsers));
-
-        if (savedToCloud) {
-          setSuccess("Usuário cadastrado com sucesso na Nuvem! Conectando...");
-        } else {
-          setSuccess("Usuário cadastrado localmente! Conectando...");
+        if (error) {
+          // Fallback: check legacy users table (plain-text passwords, for accounts not yet migrated to Auth)
+          if (error.message.includes("Invalid login credentials")) {
+            const legacyUser = await getFirestoreUser(email.toLowerCase().trim());
+            if (legacyUser && legacyUser.password === password) {
+              sessionStorage.setItem("gd_auth", "true");
+              sessionStorage.setItem("gd_auth_email", legacyUser.email);
+              onLogin(legacyUser.name, legacyUser.oab);
+              setSuccess(`Bem-vindo de volta, ${legacyUser.name}!`);
+              setLoading(false);
+              return;
+            }
+          }
+          setErr(
+            error.message.includes("Invalid login credentials")
+              ? "E-mail ou senha incorretos."
+              : error.message.includes("Email not confirmed")
+              ? "Por favor, confirme seu e-mail antes de entrar."
+              : "Erro ao conectar. Verifique sua conexão e tente novamente."
+          );
+          setLoading(false);
+          return;
         }
 
-        setTimeout(() => {
-          sessionStorage.setItem("gd_auth", "true");
-          sessionStorage.setItem("gd_auth_email", newUser.email);
-          onLogin(newUser.name, newUser.oab);
+        const meta = data.user?.user_metadata ?? {};
+        const userName = (meta.name as string) || data.user?.email || "Usuário";
+        const userOab = (meta.oab as string) || "";
+
+        sessionStorage.setItem("gd_auth", "true");
+        sessionStorage.setItem("gd_auth_email", data.user?.email || email);
+        onLogin(userName, userOab);
+        setSuccess(`Bem-vindo de volta, ${userName}!`);
+      } else {
+        // Registration — Supabase Auth signUp (passwords hashed server-side)
+        if (!name) { setErr("Por favor, preencha o seu nome completo."); setLoading(false); return; }
+        if (password !== confirmPassword) { setErr("As senhas não coincidem."); setLoading(false); return; }
+        if (password.length < 6) { setErr("A senha deve conter pelo menos 6 caracteres."); setLoading(false); return; }
+        if (email.toLowerCase().trim() === defaultEmail.toLowerCase().trim()) {
+          setErr("Este e-mail é reservado para o administrador principal."); setLoading(false); return;
+        }
+
+        const finalOab = oab.trim() || `OAB/SP ${Math.floor(100000 + Math.random() * 900000)}`;
+
+        const { data, error } = await supabase.auth.signUp({
+          email: email.toLowerCase().trim(),
+          password,
+          options: { data: { name: name.trim(), oab: finalOab } },
+        });
+
+        if (error) {
+          setErr(
+            error.message.includes("already registered")
+              ? "Este e-mail já está cadastrado. Faça o login."
+              : "Erro ao cadastrar. Verifique sua conexão e tente novamente."
+          );
           setLoading(false);
-        }, 1200);
+          return;
+        }
+
+        // If email confirmation is disabled in Supabase, session is returned immediately
+        if (data.session) {
+          sessionStorage.setItem("gd_auth", "true");
+          sessionStorage.setItem("gd_auth_email", data.user?.email || email);
+          setSuccess("Cadastro realizado! Conectando...");
+          setTimeout(() => { onLogin(name.trim(), finalOab); setLoading(false); }, 800);
+        } else {
+          // Email confirmation required
+          setSuccess("Cadastro realizado! Verifique seu e-mail para confirmar a conta antes de entrar.");
+          setLoading(false);
+        }
         return;
       }
     } catch (e: any) {
       console.error(e);
-      setErr("Erro de rede ao conectar com o servidor da Nuvem.");
+      setErr("Erro de rede ao conectar com o servidor.");
     } finally {
-      if (authMode === "login") {
-        setLoading(false);
-      }
+      if (authMode === "login") setLoading(false);
     }
   };
 

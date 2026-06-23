@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { PriorityBill } from "../types";
+import { formatCurrency } from "../utils/currency";
 import { 
   MessageSquare,
   Settings,
@@ -36,11 +37,11 @@ export default function WhatsAppTab({ bills }: WhatsAppTabProps) {
   // Outbound Configuration states (stored locally to persist setups)
   const [phoneNumber, setPhoneNumber] = useState(() => localStorage.getItem("ws_phone") || "+55 (11) 99999-9999");
   const [integrationType, setIntegrationType] = useState<"twilio" | "webhook">(() => (localStorage.getItem("ws_type") as "twilio" | "webhook") || "webhook");
-  const [twilioSid, setTwilioSid] = useState(() => localStorage.getItem("ws_twilio_sid") || "");
-  const [twilioToken, setTwilioToken] = useState(() => localStorage.getItem("ws_twilio_token") || "");
+  const [twilioSid, setTwilioSid] = useState(() => sessionStorage.getItem("ws_twilio_sid") || "");
+  const [twilioToken, setTwilioToken] = useState(() => sessionStorage.getItem("ws_twilio_token") || "");
   const [twilioFrom, setTwilioFrom] = useState(() => localStorage.getItem("ws_twilio_from") || "whatsapp:+14155238886");
   const [webhookUrl, setWebhookUrl] = useState(() => localStorage.getItem("ws_webhook_url") || "https://api.exemplo.com/whatsapp-webhook");
-  const [webhookToken, setWebhookToken] = useState(() => localStorage.getItem("ws_webhook_token") || "");
+  const [webhookToken, setWebhookToken] = useState(() => sessionStorage.getItem("ws_webhook_token") || "");
   
   // Test alerts states
   const [isTesting, setIsTesting] = useState(false);
@@ -52,23 +53,16 @@ export default function WhatsAppTab({ bills }: WhatsAppTabProps) {
     e.preventDefault();
     localStorage.setItem("ws_phone", phoneNumber);
     localStorage.setItem("ws_type", integrationType);
-    localStorage.setItem("ws_twilio_sid", twilioSid);
-    localStorage.setItem("ws_twilio_token", twilioToken);
+    sessionStorage.setItem("ws_twilio_sid", twilioSid);
+    sessionStorage.setItem("ws_twilio_token", twilioToken);
     localStorage.setItem("ws_twilio_from", twilioFrom);
     localStorage.setItem("ws_webhook_url", webhookUrl);
-    localStorage.setItem("ws_webhook_token", webhookToken);
+    sessionStorage.setItem("ws_webhook_token", webhookToken);
     
     setSaveStatusMsg("Configurações salvas com sucesso!");
     setTimeout(() => {
       setSaveStatusMsg("");
     }, 4000);
-  };
-
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
   };
 
   const handleTestApiAlert = async () => {
@@ -281,11 +275,11 @@ export default function WhatsAppTab({ bills }: WhatsAppTabProps) {
             </button>
             <button
               onClick={() => { setGuideOpen(!guideOpen); if (!guideOpen) { setChatOpen(false); setConfigOpen(false); } }}
-              className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase tracking-wider text-white border transition-all cursor-pointer ${
-                guideOpen ? "bg-[#075e54] border-emerald-950 shadow-inner" : "bg-white/10 hover:bg-white/20 border-white/15"
+              className={`px-2.5 py-1 rounded font-bold text-[10px] uppercase tracking-wider border transition-all cursor-pointer ${
+                guideOpen ? "bg-amber-500 border-amber-600 text-white shadow-inner" : "bg-amber-400/20 hover:bg-amber-400/30 border-amber-300/50 text-amber-200"
               }`}
             >
-              {guideOpen ? "Fechar Guia Técnico" : "Guia: Como Fazer?"}
+              📖 {guideOpen ? "Fechar Guia" : "Como Fazer?"}
             </button>
           </div>
         </div>

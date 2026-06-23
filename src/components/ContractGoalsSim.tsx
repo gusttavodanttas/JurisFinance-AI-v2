@@ -18,6 +18,7 @@ import {
   TrendingDown
 } from "lucide-react";
 import { TransactionScope, TransactionType, Transaction } from "../types";
+import { formatCurrency } from "../utils/currency";
 
 export interface LegalProduct {
   id: string;
@@ -69,13 +70,6 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
     localStorage.setItem("legal_products_goals_v1", JSON.stringify(products));
   }, [products]);
 
-  // Format currency helper
-  const formatBRL = (val: number) => {
-    return val.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL"
-    });
-  };
 
   // Calculations
   const totalRealClosedRevenue = products.reduce((sum, p) => sum + (p.price * p.closedCount), 0);
@@ -321,7 +315,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
               ) : (
                 <div>
                   <p className="text-3xl font-black font-display tracking-tight text-slate-900 leading-none">
-                    {formatBRL(revenueGoal)}
+                    {formatCurrency(revenueGoal)}
                   </p>
                   <p className="text-[10px] text-slate-400 font-semibold tracking-wider uppercase font-mono mt-1">Faturamento Objetivo Almejado</p>
                 </div>
@@ -355,7 +349,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
               <div>
                 <div className="flex justify-between items-center text-xs font-medium text-slate-600 mb-1">
                   <span>Fechados Reais ({percentRealGoal.toFixed(0)}%)</span>
-                  <span className="font-bold text-emerald-600 font-mono">{formatBRL(totalRealClosedRevenue)}</span>
+                  <span className="font-bold text-emerald-600 font-mono">{formatCurrency(totalRealClosedRevenue)}</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
                   <div
@@ -369,7 +363,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
               <div>
                 <div className="flex justify-between items-center text-xs font-medium text-slate-600 mb-1">
                   <span>Incluindo Simulados (Total: {percentTotalGoal.toFixed(0)}%)</span>
-                  <span className="font-bold text-indigo-500 font-mono">{formatBRL(grandTotalRevenue)}</span>
+                  <span className="font-bold text-indigo-500 font-mono">{formatCurrency(grandTotalRevenue)}</span>
                 </div>
                 <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden relative">
                   {/* Real contribution */}
@@ -406,9 +400,9 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
             ) : (
               <div className="bg-amber-50/40 border border-amber-100/60 rounded-xl p-3">
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider font-mono">Falta para Atentar a Meta:</p>
-                <p className="text-xl font-bold font-mono text-slate-800 mt-0.5">{formatBRL(remainingGap)}</p>
+                <p className="text-xl font-bold font-mono text-slate-800 mt-0.5">{formatCurrency(remainingGap)}</p>
                 {simulatedRemainingGap > 0 ? (
-                  <p className="text-[11px] text-slate-500 mt-1">E se fechar os simulados, ainda faltarão <span className="font-semibold text-indigo-600">{formatBRL(simulatedRemainingGap)}</span>.</p>
+                  <p className="text-[11px] text-slate-500 mt-1">E se fechar os simulados, ainda faltarão <span className="font-semibold text-indigo-600">{formatCurrency(simulatedRemainingGap)}</span>.</p>
                 ) : (
                   <p className="text-[11px] text-[#2563eb] font-semibold mt-1">🎉 Com os simulados, sua meta é totalmente batida!</p>
                 )}
@@ -504,7 +498,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
                               +
                             </button>
                             <span className="text-[10px] font-bold font-mono text-emerald-600 bg-emerald-50 p-1 py-0.5 rounded ml-1" title="Subtotal Real faturado com este item">
-                              {formatBRL(subtotalReal)}
+                              {formatCurrency(subtotalReal)}
                             </span>
                           </div>
                         </div>
@@ -529,7 +523,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
                               +
                             </button>
                             <span className="text-[10px] font-bold font-mono text-indigo-600 bg-indigo-50 p-1 py-0.5 rounded ml-1" title="Subtotal projetado com este item">
-                              {formatBRL(subtotalSim)}
+                              {formatCurrency(subtotalSim)}
                             </span>
                           </div>
                         </div>
@@ -625,7 +619,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
                   <p className="text-xs uppercase font-extrabold text-[#c084fc] font-mono tracking-widest">Opções Recomendadas para Bater Meta</p>
                 </div>
                 <p className="text-xs text-indigo-200">
-                  Para cobrir o gap remanescente de <span className="font-bold text-white font-mono">{formatBRL(remainingGap)}</span>, você pode focar nas seguintes conversões de vendas sugeridas:
+                  Para cobrir o gap remanescente de <span className="font-bold text-white font-mono">{formatCurrency(remainingGap)}</span>, você pode focar nas seguintes conversões de vendas sugeridas:
                 </p>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-3">
@@ -635,10 +629,10 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
                         <p className="font-bold text-indigo-300 uppercase text-[10px]">Sugestão {idx + 1}</p>
                         <div className="space-y-0.5 text-slate-100">
                           {combo.items.map((it, cIdx) => (
-                            <p key={cIdx}>• <b>{it.qty}x</b> {it.product.name.split(" ")[0]} ({formatBRL(it.product.price)})</p>
+                            <p key={cIdx}>• <b>{it.qty}x</b> {it.product.name.split(" ")[0]} ({formatCurrency(it.product.price)})</p>
                           ))}
                         </div>
-                        <p className="text-[10px] text-emerald-400 font-bold font-mono border-t border-indigo-900/80 pt-1 mt-1">Total: {formatBRL(combo.totalPrice)}</p>
+                        <p className="text-[10px] text-emerald-400 font-bold font-mono border-t border-indigo-900/80 pt-1 mt-1">Total: {formatCurrency(combo.totalPrice)}</p>
                       </div>
                     ))
                   ) : (
@@ -655,7 +649,7 @@ export const ContractGoalsSim: React.FC<ContractGoalsSimProps> = ({
                   <p className="text-sm font-bold">Excelente Governança Comercial!</p>
                 </div>
                 <p className="text-xs text-emerald-300 leading-relaxed">
-                  Sua equipe jurídica fechou um total de <span className="font-bold text-white font-mono">{formatBRL(totalRealClosedRevenue)}</span> em contratos efetivos, o que atende 100% de sua meta estabelecida para este mês.
+                  Sua equipe jurídica fechou um total de <span className="font-bold text-white font-mono">{formatCurrency(totalRealClosedRevenue)}</span> em contratos efetivos, o que atende 100% de sua meta estabelecida para este mês.
                 </p>
               </div>
             </div>

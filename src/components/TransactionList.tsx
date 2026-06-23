@@ -18,6 +18,7 @@ import {
   Edit3,
   Check
 } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface TransactionListProps {
   transactions: Transaction[];
@@ -81,12 +82,6 @@ export default function TransactionList({
     return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch;
   });
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
-  };
 
   // Calculate stats for the filtered viewport
   const filteredProfRevenue = filteredTransactions
@@ -279,10 +274,10 @@ export default function TransactionList({
             <tr className="border-b border-[#e2e8f0] text-slate-400 font-bold uppercase tracking-wider bg-slate-50 text-[9px] font-mono">
               <th className="py-2.5 px-3 w-28 text-center whitespace-nowrap">Data</th>
               <th className="py-2.5 px-3 whitespace-nowrap">Escopo / Alocação</th>
-              <th className="py-2.5 px-3 min-w-[200px]">Descrição da Conta</th>
+              <th className="py-2.5 px-3 min-w-[180px]">Descrição da Conta</th>
+              <th className="py-2.5 px-3 text-right whitespace-nowrap">Valor Lançado</th>
               <th className="py-2.5 px-3 whitespace-nowrap">Categoria</th>
               <th className="py-2.5 px-3 whitespace-nowrap text-center">Método</th>
-              <th className="py-2.5 px-3 text-right whitespace-nowrap">Valor Lançado</th>
               <th className="py-2.5 px-3 w-24 text-center">Ações</th>
             </tr>
           </thead>
@@ -356,21 +351,21 @@ export default function TransactionList({
                       )}
                     </td>
 
+                    {/* Amount */}
+                    <td className="py-2.5 px-3 text-right font-semibold font-mono text-[12px] whitespace-nowrap">
+                      <span className={isRevenue ? "text-emerald-600" : "text-rose-500"}>
+                        {isRevenue ? "+" : "-"} {formatCurrency(t.amount)}
+                      </span>
+                    </td>
+
                     {/* Category */}
-                    <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 font-medium text-[11px]">
+                    <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 font-medium text-[11px] max-w-[120px] truncate" title={t.category}>
                       {t.category}
                     </td>
 
                     {/* Payment Method */}
                     <td className="py-2.5 px-3 text-center whitespace-nowrap text-slate-400 text-[11px]">
                       {t.paymentMethod || "—"}
-                    </td>
-
-                    {/* Amount */}
-                    <td className="py-2.5 px-3 text-right font-semibold font-mono text-[12px] whitespace-nowrap">
-                      <span className={isRevenue ? "text-emerald-600" : "text-rose-500"}>
-                        {isRevenue ? "+" : "-"} {formatCurrency(t.amount)}
-                      </span>
                     </td>
 
                     {/* Actions */}

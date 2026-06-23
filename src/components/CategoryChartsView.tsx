@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { Transaction, TransactionScope, TransactionType } from "../types";
 import { PieChart as PieIcon, Briefcase, User, HelpCircle, LayoutGrid } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface CategoryChartsViewProps {
   transactions: Transaction[];
@@ -75,13 +76,6 @@ export default function CategoryChartsView({ transactions, selectedMonth }: Cate
     };
   }, [filteredTx]);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      maximumFractionDigits: 0
-    }).format(val);
-  };
 
   const getMonthTitle = () => {
     if (selectedMonth === "ALL") return "Todos os Períodos";
@@ -101,7 +95,7 @@ export default function CategoryChartsView({ transactions, selectedMonth }: Cate
           <p className="font-bold border-b border-slate-800 pb-1 text-slate-300">{data.name}</p>
           <div className="flex justify-between gap-6 items-center">
             <span className="text-slate-400">Total:</span>
-            <span className="font-semibold text-white">{formatCurrency(data.value)}</span>
+            <span className="font-semibold text-white">{formatCurrency(data.value, { maximumFractionDigits: 0 })}</span>
           </div>
           <div className="flex justify-between gap-6 items-center">
             <span className="text-slate-400">Proporção:</span>
@@ -128,7 +122,7 @@ export default function CategoryChartsView({ transactions, selectedMonth }: Cate
         <div className="flex justify-between items-center mb-3">
           <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">{title}</h4>
           <span className="text-xs font-mono font-bold text-slate-800 bg-slate-100 px-2 py-1 rounded">
-            Total: {formatCurrency(total)}
+            Total: {formatCurrency(total, { maximumFractionDigits: 0 })}
           </span>
         </div>
 
@@ -175,7 +169,7 @@ export default function CategoryChartsView({ transactions, selectedMonth }: Cate
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colors[idx % colors.length] }} />
                 <span className="truncate">{item.name}</span>
               </div>
-              <span className="font-mono text-slate-500 font-bold shrink-0">{formatCurrency(item.value)} ({item.percentage.toFixed(0)}%)</span>
+              <span className="font-mono text-slate-500 font-bold shrink-0">{formatCurrency(item.value, { maximumFractionDigits: 0 })} ({item.percentage.toFixed(0)}%)</span>
             </div>
           ))}
         </div>

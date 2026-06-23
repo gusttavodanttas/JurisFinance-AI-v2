@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   AlertCircle
 } from "lucide-react";
+import { formatCurrency } from "../utils/currency";
 
 interface AISeparatorProps {
   onAddTransactions: (newTransactions: Omit<Transaction, "id">[]) => void;
@@ -134,12 +135,6 @@ export default function AISeparator({ onAddTransactions }: AISeparatorProps) {
     setRawText("");
   };
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(val);
-  };
 
   return (
     <div id="ai-separator-widget" className="bg-[#0f172a] rounded-lg p-5 text-white shadow-md border border-slate-800">

@@ -33,6 +33,8 @@ export interface PriorityBill {
   notes?: string;
   month?: string; // YYYY-MM selected month
   category?: string; // AI categorized or manual category
+  dueDay?: number; // Day of month for due date (1–31)
+  paymentMethod?: string; // e.g. Pix, Boleto, Débito Automático
 }
 
 export interface AISeparationPreview {
