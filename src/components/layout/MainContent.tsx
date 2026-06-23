@@ -153,7 +153,14 @@ export default function MainContent() {
 
           {dashboardSubTab === "overview" && (
             <div className="space-y-6 animate-slide-up">
-              <DashboardStats transactions={transactionsWithBills} selectedMonth={selectedMonth} monthlyRevenueTarget={monthlyRevenueTarget} onSetMonthlyTarget={setMonthlyRevenueTarget} />
+              <DashboardStats
+                transactions={transactionsWithBills}
+                allTransactions={transactions}
+                selectedMonth={selectedMonth}
+                monthlyRevenueTarget={monthlyRevenueTarget}
+                onSetMonthlyTarget={setMonthlyRevenueTarget}
+                onGoToLedger={() => setActiveTab("ledger")}
+              />
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="xl:col-span-2">
                   <CashFlowChart transactions={transactionsWithBills} priorityBills={priorityBills} />

@@ -78,6 +78,9 @@ export default function TransactionList({
   const [showCsvPreview, setShowCsvPreview] = useState(false);
   const [showUnreconciled, setShowUnreconciled] = useState(false);
   const [showBalance, setShowBalance] = useState(false);
+  const [clientFilter, setClientFilter] = useState<string>("ALL");
+  const [pageSize, setPageSize] = useState<number>(50);
+  const [page, setPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get distinct list of available months in transactions, plus some key active months
@@ -151,8 +154,17 @@ export default function TransactionList({
     const matchesDateTo = !dateTo || t.date <= dateTo;
 
     const matchesReconciled = !showUnreconciled || !t.reconciled;
-    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo && matchesReconciled;
+    const matchesClient = clientFilter === "ALL" || t.clientName === clientFilter;
+    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo && matchesReconciled && matchesClient;
   });
+
+  // Pagination
+  const totalPages = pageSize === 0 ? 1 : Math.ceil(filteredTransactions.length / pageSize);
+  const safePageSize = pageSize === 0 ? filteredTransactions.length : pageSize;
+  const paginatedTransactions = filteredTransactions.slice((page - 1) * safePageSize, page * safePageSize);
+
+  // Reset page when filters change
+  React.useEffect(() => { setPage(1); }, [search, scopeFilter, typeFilter, categoryFilter, dateFrom, dateTo, selectedMonth, showUnreconciled, clientFilter]);
 
 
   // Calculate stats for the filtered viewport
@@ -218,7 +230,7 @@ export default function TransactionList({
       </div>
 
       {/* FILTER SEARCH CRITERIA ROW */}
-      <div id="filter-controls-row" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-lg mb-4">
+      <div id="filter-controls-row" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-2 bg-slate-50 p-3 rounded-lg mb-4">
         {/* Search */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -301,6 +313,22 @@ export default function TransactionList({
             className="w-full bg-transparent text-xs text-slate-500 focus:outline-none cursor-pointer"
             placeholder="Até" title="Data final" />
         </div>
+
+        {/* Client filter */}
+        {(() => {
+          const clients = Array.from(new Set(transactions.map(t => t.clientName).filter(Boolean))) as string[];
+          if (clients.length === 0) return null;
+          return (
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2 py-1.5">
+              <User className="w-3 h-3 text-slate-400 flex-shrink-0" />
+              <select value={clientFilter} onChange={e => setClientFilter(e.target.value)}
+                className="w-full bg-transparent text-xs text-slate-600 focus:outline-none cursor-pointer">
+                <option value="ALL">Todos Clientes</option>
+                {clients.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          );
+        })()}
       </div>
 
       {/* CSV Import Preview */}
@@ -452,7 +480,7 @@ export default function TransactionList({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
-            {filteredTransactions.length === 0 ? (
+            {paginatedTransactions.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-12 text-center text-slate-400">
                   <div className="flex flex-col items-center justify-center gap-3">
@@ -485,7 +513,7 @@ export default function TransactionList({
                 if (t.status !== "PREVISTO") bal += t.type === TransactionType.REVENUE ? t.amount : -t.amount;
                 balMap.set(t.id, bal);
               });
-              return filteredTransactions.map((t) => {
+              return paginatedTransactions.map((t) => {
                 const isProf = t.scope === TransactionScope.PROFESSIONAL;
                 const isRevenue = t.type === TransactionType.REVENUE;
 
@@ -636,7 +664,7 @@ export default function TransactionList({
             </div>
           </div>
         ) : (
-          filteredTransactions.map((t) => {
+          paginatedTransactions.map((t) => {
             const isProf = t.scope === TransactionScope.PROFESSIONAL;
             const isRevenue = t.type === TransactionType.REVENUE;
             const isPersonalLeak = t.scope === TransactionScope.PERSONAL && t.isAiCategorized;
@@ -745,6 +773,46 @@ export default function TransactionList({
           })
         )}
       </div>
+
+      {/* PAGINATION */}
+      {filteredTransactions.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-500 font-mono">Itens por página:</span>
+            {[25, 50, 100, 0].map(n => (
+              <button key={n} onClick={() => { setPageSize(n); setPage(1); }}
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md border transition cursor-pointer ${pageSize === n ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-500 border-slate-200 hover:border-indigo-300 hover:text-indigo-600"}`}>
+                {n === 0 ? "Todos" : n}
+              </button>
+            ))}
+          </div>
+          {pageSize > 0 && totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button onClick={() => setPage(1)} disabled={page === 1}
+                className="px-2 py-1 text-[10px] font-bold rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer">«</button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="px-2 py-1 text-[10px] font-bold rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer">‹</button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+                return start + i;
+              }).map(p => (
+                <button key={p} onClick={() => setPage(p)}
+                  className={`w-7 h-7 text-[10px] font-bold rounded border transition cursor-pointer ${page === p ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-500 border-slate-200 hover:bg-slate-50"}`}>
+                  {p}
+                </button>
+              ))}
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="px-2 py-1 text-[10px] font-bold rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer">›</button>
+              <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+                className="px-2 py-1 text-[10px] font-bold rounded border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 disabled:opacity-30 cursor-pointer">»</button>
+              <span className="text-[10px] text-slate-400 font-mono ml-1">{page}/{totalPages}</span>
+            </div>
+          )}
+          <span className="text-[10px] text-slate-400 font-mono">
+            {pageSize === 0 ? filteredTransactions.length : Math.min(page * pageSize, filteredTransactions.length)} de {filteredTransactions.length}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

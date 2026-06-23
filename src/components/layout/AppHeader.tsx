@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Plus, ChevronLeft, ChevronRight, Edit3, Menu, Search, Download, Upload, MoreVertical, Settings } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Edit3, Menu, Search, Download, Upload, MoreVertical, Settings, Moon, Sun } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -11,6 +11,7 @@ export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalet
     userName, setIsEditProfileOpen, handleLogout,
     setIsModalOpen, setTransactionToEdit, mobileMenuOpen, setMobileMenuOpen,
     handleExportBackup, handleImportBackup, setActiveTab,
+    darkMode, toggleDarkMode,
   } = useApp();
 
   const importRef = useRef<HTMLInputElement>(null);
@@ -104,6 +105,12 @@ export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalet
             <span className="hidden sm:inline font-sans">Lançar</span>
           </button>
 
+          {/* Dark mode toggle */}
+          <button onClick={toggleDarkMode} title={darkMode ? "Modo Claro" : "Modo Escuro"}
+            className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer bg-white">
+            {darkMode ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+          </button>
+
           {/* Backup — desktop only */}
           <div className="hidden md:flex items-center gap-1">
             <button onClick={handleExportBackup} title="Exportar backup JSON"
@@ -165,6 +172,11 @@ export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalet
                 <button onClick={() => { setActiveTab("settings"); setShowMore(false); }}
                   className="w-full text-left px-3 py-2.5 flex items-center gap-2 hover:bg-slate-50 text-slate-700 cursor-pointer">
                   <Settings className="w-3.5 h-3.5 text-slate-400" /> Configurações
+                </button>
+                <button onClick={() => { toggleDarkMode(); setShowMore(false); }}
+                  className="w-full text-left px-3 py-2.5 flex items-center gap-2 hover:bg-slate-50 text-slate-700 cursor-pointer">
+                  {darkMode ? <Sun className="w-3.5 h-3.5 text-amber-400" /> : <Moon className="w-3.5 h-3.5 text-indigo-400" />}
+                  {darkMode ? "Modo Claro" : "Modo Escuro"}
                 </button>
                 <div className="border-t border-slate-100 my-1" />
                 <button onClick={() => { setIsEditProfileOpen(true); setShowMore(false); }}

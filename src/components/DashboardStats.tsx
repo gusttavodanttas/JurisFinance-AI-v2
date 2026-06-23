@@ -1,27 +1,35 @@
-import React from "react";
+import React, { useState } from "react";
 import { Transaction, TransactionScope, TransactionType } from "../types";
-import { 
-  Building2, 
-  User, 
-  TrendingUp, 
-  TrendingDown, 
-  AlertTriangle, 
-  CheckCircle2, 
+import {
+  Building2,
+  User,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
+  CheckCircle2,
   HelpCircle,
   Scale,
   Landmark,
-  Wallet
+  Wallet,
+  Bell,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Percent,
 } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface DashboardStatsProps {
   transactions: Transaction[];
+  allTransactions?: Transaction[]; // all transactions (not filtered by month) for alerts & aging
   selectedMonth: string; // "YYYY-MM" or "ALL"
   monthlyRevenueTarget?: number;
   onSetMonthlyTarget?: (v: number) => void;
+  onGoToLedger?: () => void;
 }
 
-export default function DashboardStats({ transactions, selectedMonth, monthlyRevenueTarget = 0, onSetMonthlyTarget }: DashboardStatsProps) {
+export default function DashboardStats({ transactions, allTransactions, selectedMonth, monthlyRevenueTarget = 0, onSetMonthlyTarget, onGoToLedger }: DashboardStatsProps) {
+  const [showDueAlerts, setShowDueAlerts] = useState(true);
   // Filter transactions for the selected month (both previsto and realized)
   const monthTx = transactions.filter((t) => {
     if (selectedMonth === "ALL") return true;
@@ -96,6 +104,36 @@ export default function DashboardStats({ transactions, selectedMonth, monthlyRev
   };
 
   const mixingStatus = getMixingStatus(mixingIndex);
+
+  // ── Due alerts (next 7 days + overdue PREVISTO) ──────────────────────────
+  const today = new Date().toISOString().substring(0, 10);
+  const plus7 = new Date(Date.now() + 7 * 864e5).toISOString().substring(0, 10);
+  const dueAlerts = (allTransactions ?? transactions).filter(t =>
+    t.status === "PREVISTO" && t.date >= today && t.date <= plus7
+  ).sort((a, b) => a.date.localeCompare(b.date));
+  const overdueTxs = (allTransactions ?? transactions).filter(t =>
+    t.status === "PREVISTO" && t.date < today
+  );
+
+  // ── Aging receivables ────────────────────────────────────────────────────
+  const agingBuckets = { current: 0, d30: 0, d60: 0, d90: 0 };
+  (allTransactions ?? transactions)
+    .filter(t => t.status === "PREVISTO" && t.type === TransactionType.REVENUE && t.date < today)
+    .forEach(t => {
+      const diff = Math.floor((Date.now() - new Date(t.date).getTime()) / 864e5);
+      if (diff <= 30) agingBuckets.current += t.amount;
+      else if (diff <= 60) agingBuckets.d30 += t.amount;
+      else if (diff <= 90) agingBuckets.d60 += t.amount;
+      else agingBuckets.d90 += t.amount;
+    });
+  const totalAging = agingBuckets.current + agingBuckets.d30 + agingBuckets.d60 + agingBuckets.d90;
+
+  // ── Tax provision ────────────────────────────────────────────────────────
+  const simplesRate = parseFloat(localStorage.getItem("oab_simples_rate") || "6") / 100;
+  const pjRevRealizedMonthly = monthTx
+    .filter(t => t.scope === TransactionScope.PROFESSIONAL && t.type === TransactionType.REVENUE && t.status !== "PREVISTO")
+    .reduce((s, t) => s + t.amount, 0);
+  const taxProvision = pjRevRealizedMonthly * simplesRate;
 
   const getMonthTitleLabel = () => {
     if (selectedMonth === "ALL") return "Acumulado Histórico";
@@ -437,7 +475,127 @@ export default function DashboardStats({ transactions, selectedMonth, monthlyRev
           </div>
         </div>
       )}
-      
+
+      {/* ── DUE ALERTS ─────────────────────────────────────────────────────── */}
+      {(dueAlerts.length > 0 || overdueTxs.length > 0) && (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-xs overflow-hidden">
+          <button
+            onClick={() => setShowDueAlerts(v => !v)}
+            className="w-full flex items-center justify-between px-5 py-3.5 cursor-pointer hover:bg-amber-50 transition-colors"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 bg-amber-100 rounded-lg"><Bell className="w-4 h-4 text-amber-600" /></div>
+              <div className="text-left">
+                <p className="text-xs font-bold text-slate-800">Vencimentos & Pendências</p>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  {dueAlerts.length} vencem nos próximos 7 dias
+                  {overdueTxs.length > 0 && <span className="text-rose-600 font-bold"> · {overdueTxs.length} em atraso</span>}
+                </p>
+              </div>
+            </div>
+            {showDueAlerts ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+          </button>
+          {showDueAlerts && (
+            <div className="border-t border-amber-100 divide-y divide-amber-50">
+              {overdueTxs.slice(0, 3).map(t => (
+                <div key={t.id} className="flex items-center gap-3 px-5 py-2.5 bg-rose-50/50">
+                  <Clock className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{t.description}</p>
+                    <p className="text-[10px] text-rose-600 font-mono">{t.date.split("-").reverse().join("/")} · Em atraso</p>
+                  </div>
+                  <span className={`text-xs font-bold font-mono shrink-0 ${t.type === TransactionType.REVENUE ? "text-emerald-600" : "text-rose-600"}`}>
+                    {t.type === TransactionType.REVENUE ? "+" : "-"}{formatCurrency(t.amount)}
+                  </span>
+                </div>
+              ))}
+              {dueAlerts.map(t => (
+                <div key={t.id} className="flex items-center gap-3 px-5 py-2.5">
+                  <Clock className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-800 truncate">{t.description}</p>
+                    <p className="text-[10px] text-slate-500 font-mono">{t.date.split("-").reverse().join("/")} · {t.type === TransactionType.REVENUE ? "A receber" : "A pagar"}</p>
+                  </div>
+                  <span className={`text-xs font-bold font-mono shrink-0 ${t.type === TransactionType.REVENUE ? "text-emerald-600" : "text-rose-600"}`}>
+                    {t.type === TransactionType.REVENUE ? "+" : "-"}{formatCurrency(t.amount)}
+                  </span>
+                </div>
+              ))}
+              {(dueAlerts.length + overdueTxs.length) > 6 && (
+                <div className="px-5 py-2 text-center">
+                  <button onClick={onGoToLedger} className="text-[10px] text-indigo-600 font-bold hover:underline cursor-pointer">
+                    Ver todos no Livro Caixa →
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── GRID: Aging + Tax Provision ────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+        {/* Aging de Recebíveis */}
+        {totalAging > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs">
+            <div className="flex items-center gap-2 mb-4">
+              <Clock className="w-4 h-4 text-rose-500" />
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Aging de Recebíveis</p>
+                <p className="text-xs font-bold text-slate-700">Honorários em aberto · {formatCurrency(totalAging)}</p>
+              </div>
+            </div>
+            <div className="space-y-2.5">
+              {[
+                { label: "0 – 30 dias", value: agingBuckets.current, color: "bg-amber-400" },
+                { label: "31 – 60 dias", value: agingBuckets.d30, color: "bg-orange-500" },
+                { label: "61 – 90 dias", value: agingBuckets.d60, color: "bg-rose-500" },
+                { label: "+ 90 dias", value: agingBuckets.d90, color: "bg-rose-700" },
+              ].filter(b => b.value > 0).map(b => (
+                <div key={b.label}>
+                  <div className="flex justify-between text-[10px] font-mono mb-1">
+                    <span className="text-slate-500">{b.label}</span>
+                    <span className="font-bold text-slate-700">{formatCurrency(b.value)}</span>
+                  </div>
+                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${b.color}`} style={{ width: `${(b.value / totalAging) * 100}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Provisão de Impostos */}
+        {taxProvision > 0 && (
+          <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs">
+            <div className="flex items-center gap-2 mb-4">
+              <Percent className="w-4 h-4 text-indigo-500" />
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Provisão de Impostos</p>
+                <p className="text-xs font-bold text-slate-700">Simples Nacional — {(simplesRate * 100).toFixed(1)}%</p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <p className="text-[10px] text-slate-500 mb-0.5">Receita PJ Realizada ({getMonthTitleLabel()})</p>
+                <p className="text-lg font-black font-mono text-slate-900">{formatCurrency(pjRevRealizedMonthly)}</p>
+              </div>
+              <div className="border-t border-slate-100 pt-3">
+                <p className="text-[10px] text-slate-500 mb-0.5">Valor a Reservar</p>
+                <p className="text-2xl font-black font-mono text-rose-600">{formatCurrency(taxProvision)}</p>
+              </div>
+              <p className="text-[9px] text-slate-400 font-mono">
+                Alíquota configurada em Configurações → Simples Nacional.<br />
+                Não inclui ISS municipal. Consulte seu contador.
+              </p>
+            </div>
+          </div>
+        )}
+
+      </div>
+
     </div>
   );
 }

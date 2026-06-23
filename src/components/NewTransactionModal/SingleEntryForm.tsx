@@ -1,6 +1,6 @@
 import React from "react";
 import { Transaction, TransactionScope, TransactionType, ALL_CATEGORIES_MAP } from "../../types";
-import { X, Check, Eye, EyeOff } from "lucide-react";
+import { X, Check, Eye, EyeOff, Repeat } from "lucide-react";
 
 interface SingleEntryFormProps {
   isEditMode: boolean;
@@ -14,6 +14,8 @@ interface SingleEntryFormProps {
   notes: string; setNotes: (v: string) => void;
   isMixedIncident: boolean; setIsMixedIncident: (v: boolean) => void;
   status: "PREVISTO" | "REALIZADO"; setStatus: (v: "PREVISTO" | "REALIZADO") => void;
+  repeat: boolean; setRepeat: (v: boolean) => void;
+  repeatCount: number; setRepeatCount: (v: number) => void;
   matchedCategoriesList: string[];
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
@@ -24,7 +26,8 @@ export default function SingleEntryForm({
   scope, setScope, type, setType, category, setCategory,
   amount, setAmount, paymentMethod, setPaymentMethod,
   notes, setNotes, isMixedIncident, setIsMixedIncident,
-  status, setStatus, matchedCategoriesList, onSubmit, onClose,
+  status, setStatus, repeat, setRepeat, repeatCount, setRepeatCount,
+  matchedCategoriesList, onSubmit, onClose,
 }: SingleEntryFormProps) {
   return (
     <form onSubmit={onSubmit} className="p-5 space-y-4 font-sans" id="single-entry-form">
@@ -135,6 +138,29 @@ export default function SingleEntryForm({
           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 min-h-[50px] text-slate-800" />
       </div>
 
+      {/* Parcelamento */}
+      {!isEditMode && (
+        <div className={`rounded-lg border p-3 transition-colors ${repeat ? "bg-indigo-50 border-indigo-200" : "bg-slate-50 border-slate-200"}`}>
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" checked={repeat} onChange={e => setRepeat(e.target.checked)}
+              className="rounded accent-indigo-600 w-3.5 h-3.5 cursor-pointer" />
+            <Repeat className={`w-3.5 h-3.5 ${repeat ? "text-indigo-600" : "text-slate-400"}`} />
+            <span className={`text-xs font-bold ${repeat ? "text-indigo-800" : "text-slate-600"}`}>Repetir mensalmente (parcelamento)</span>
+          </label>
+          {repeat && (
+            <div className="mt-2.5 flex items-center gap-3 pl-6">
+              <span className="text-[10px] text-slate-500 font-mono">Repetir por</span>
+              <input type="number" min={2} max={60} value={repeatCount} onChange={e => setRepeatCount(Math.max(2, Math.min(60, parseInt(e.target.value) || 2)))}
+                className="w-16 border border-indigo-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-indigo-800 focus:outline-none focus:border-indigo-400 bg-white text-center" />
+              <span className="text-[10px] text-slate-500 font-mono">meses (parcelas)</span>
+              <span className="text-[10px] text-indigo-600 font-bold bg-indigo-100 px-2 py-0.5 rounded font-mono">
+                {repeatCount}× {amount ? `R$ ${(parseFloat(amount) || 0).toFixed(2)}` : "R$ 0,00"}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="flex justify-end gap-2 px-1 pt-3 border-t border-slate-100">
         <button type="button" onClick={onClose}
           className="px-4 py-2 text-xs font-extrabold text-[#64748b] bg-slate-100 hover:bg-slate-200/80 rounded-lg transition-colors cursor-pointer">
@@ -143,7 +169,7 @@ export default function SingleEntryForm({
         <button type="submit"
           className="px-5 py-2 text-xs font-extrabold text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs">
           <Check className="w-3.5 h-3.5" />
-          {isEditMode ? "Salvar Alterações" : "Salvar Lançamento"}
+          {isEditMode ? "Salvar Alterações" : repeat && repeatCount > 1 ? `Criar ${repeatCount} Parcelas` : "Salvar Lançamento"}
         </button>
       </div>
     </form>

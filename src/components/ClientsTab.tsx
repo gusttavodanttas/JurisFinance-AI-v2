@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Client, Transaction, TransactionType } from "../types";
-import { Users, Plus, Trash2, Edit3, Phone, Mail, FileText, TrendingUp, Clock, Check, X } from "lucide-react";
+import { Client, Transaction, TransactionType, TransactionScope } from "../types";
+import { Users, Plus, Trash2, Edit3, Phone, Mail, FileText, TrendingUp, Clock, Check, X, ExternalLink } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface ClientsTabProps {
@@ -43,6 +43,8 @@ export default function ClientsTab({ clients, transactions, onAddClient, onUpdat
     const pending = transactions.filter(t => t.clientName === clientName && t.status === "PREVISTO" && t.type === TransactionType.REVENUE).reduce((s, t) => s + t.amount, 0);
     return { received, pending, txCount: txs.length };
   };
+
+  const [statementClient, setStatementClient] = useState<Client | null>(null);
 
   const filtered = clients.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase()));
   const totalReceived = clients.reduce((s, c) => s + getClientStats(c.name).received, 0);
@@ -148,6 +150,10 @@ export default function ClientsTab({ clients, transactions, onAddClient, onUpdat
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <button onClick={() => setStatementClient(c)} title="Ver extrato do cliente"
+                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition cursor-pointer">
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </button>
                     <button onClick={() => startEdit(c)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition cursor-pointer">
                       <Edit3 className="w-3.5 h-3.5" />
                     </button>
@@ -161,6 +167,72 @@ export default function ClientsTab({ clients, transactions, onAddClient, onUpdat
           </div>
         )}
       </div>
+
+      {/* Extrato modal */}
+      {statementClient && (() => {
+        const clientTxs = transactions
+          .filter(t => t.clientName === statementClient.name)
+          .sort((a, b) => b.date.localeCompare(a.date));
+        const totalRec = clientTxs.filter(t => t.type === TransactionType.REVENUE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0);
+        const totalPend = clientTxs.filter(t => t.type === TransactionType.REVENUE && t.status === "PREVISTO").reduce((s, t) => s + t.amount, 0);
+        const totalExp = clientTxs.filter(t => t.type === TransactionType.EXPENSE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0);
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" onClick={() => setStatementClient(null)}>
+            <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 bg-slate-950 rounded-t-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-indigo-600/30 flex items-center justify-center">
+                    <span className="text-indigo-300 font-black text-sm">{statementClient.name.charAt(0).toUpperCase()}</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white">{statementClient.name}</p>
+                    <p className="text-[10px] text-slate-400">Extrato completo de lançamentos</p>
+                  </div>
+                </div>
+                <button onClick={() => setStatementClient(null)} className="text-slate-400 hover:text-white transition cursor-pointer"><X className="w-5 h-5" /></button>
+              </div>
+              {/* KPIs */}
+              <div className="grid grid-cols-3 gap-px bg-slate-100 border-b border-slate-200">
+                {[
+                  { label: "Recebido", value: totalRec, cls: "text-emerald-600" },
+                  { label: "A Receber", value: totalPend, cls: "text-amber-600" },
+                  { label: "Custos", value: totalExp, cls: "text-rose-600" },
+                ].map(k => (
+                  <div key={k.label} className="bg-white px-4 py-3 text-center">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{k.label}</p>
+                    <p className={`text-lg font-black font-mono ${k.cls}`}>{formatCurrency(k.value)}</p>
+                  </div>
+                ))}
+              </div>
+              {/* Transactions */}
+              <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+                {clientTxs.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400">
+                    <FileText className="w-10 h-10 mx-auto mb-3 text-slate-200" />
+                    <p className="text-sm font-bold">Nenhum lançamento vinculado</p>
+                    <p className="text-xs mt-1">Associe lançamentos a este cliente no Livro Caixa</p>
+                  </div>
+                ) : clientTxs.map(t => (
+                  <div key={t.id} className="flex items-center gap-3 px-5 py-3">
+                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.type === TransactionType.REVENUE ? "bg-emerald-500" : "bg-rose-500"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-800 truncate">{t.description}</p>
+                      <p className="text-[10px] text-slate-400 font-mono">{t.date.split("-").reverse().join("/")} · {t.category}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xs font-bold font-mono ${t.type === TransactionType.REVENUE ? "text-emerald-600" : "text-rose-600"}`}>
+                        {t.type === TransactionType.REVENUE ? "+" : "-"}{formatCurrency(t.amount)}
+                      </p>
+                      {t.status === "PREVISTO" && <span className="text-[9px] text-amber-600 font-bold">Previsto</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

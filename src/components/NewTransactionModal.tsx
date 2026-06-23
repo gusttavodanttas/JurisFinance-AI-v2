@@ -40,6 +40,8 @@ export default function NewTransactionModal({
   const [notes, setNotes] = useState("");
   const [isMixedIncident, setIsMixedIncident] = useState(false);
   const [status, setStatus] = useState<"PREVISTO" | "REALIZADO">("REALIZADO");
+  const [repeat, setRepeat] = useState(false);
+  const [repeatCount, setRepeatCount] = useState(2);
 
   // Bulk form state
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([defaultBulkRow(), defaultBulkRow(), defaultBulkRow()]);
@@ -89,7 +91,7 @@ export default function NewTransactionModal({
     } else {
       setDate(new Date().toISOString().split("T")[0]);
       setDescription(""); setAmount(""); setPaymentMethod("PIX"); setNotes("");
-      setIsMixedIncident(false); setStatus("REALIZADO");
+      setIsMixedIncident(false); setStatus("REALIZADO"); setRepeat(false); setRepeatCount(2);
       setScope(TransactionScope.PROFESSIONAL); setType(TransactionType.EXPENSE);
       setBulkRows([defaultBulkRow(), defaultBulkRow(), defaultBulkRow()]);
     }
@@ -106,6 +108,24 @@ export default function NewTransactionModal({
 
     if (initialTransaction && onUpdate) {
       onUpdate({ ...initialTransaction, date, description, type, scope, category, amount: parseFloat(amount), paymentMethod, notes: actualNotes, isAiCategorized: isMixedIncident, status });
+    } else if (repeat && repeatCount > 1 && onSaveBulk) {
+      // Generate N installments, each 1 month apart
+      const items: Omit<Transaction, "id">[] = Array.from({ length: repeatCount }, (_, i) => {
+        const d = new Date(date + "T12:00:00");
+        d.setMonth(d.getMonth() + i);
+        const dd = d.toISOString().split("T")[0];
+        return {
+          date: dd,
+          description: `${description} (${i + 1}/${repeatCount})`,
+          type, scope, category,
+          amount: parseFloat(amount),
+          paymentMethod,
+          notes: actualNotes,
+          isAiCategorized: isMixedIncident,
+          status: i === 0 ? status : "PREVISTO",
+        };
+      });
+      onSaveBulk(items);
     } else {
       onSave({ date, description, type, scope, category, amount: parseFloat(amount), paymentMethod, notes: actualNotes, isAiCategorized: isMixedIncident, status });
     }
@@ -187,6 +207,8 @@ export default function NewTransactionModal({
             notes={notes} setNotes={setNotes}
             isMixedIncident={isMixedIncident} setIsMixedIncident={setIsMixedIncident}
             status={status} setStatus={setStatus}
+            repeat={repeat} setRepeat={setRepeat}
+            repeatCount={repeatCount} setRepeatCount={setRepeatCount}
             matchedCategoriesList={matchedCategoriesList}
             onSubmit={handleSingleSubmit}
             onClose={onClose}

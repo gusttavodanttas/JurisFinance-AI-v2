@@ -18,6 +18,8 @@ interface AppContextValue {
   isAuthenticated: boolean;
   handleLogin: (name?: string, oab?: string) => void;
   handleLogout: () => void;
+  darkMode: boolean;
+  toggleDarkMode: () => void;
   transactions: Transaction[];
   priorityBills: PriorityBill[];
   clients: Client[];
@@ -137,6 +139,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [monthlyRevenueTarget, setMonthlyRevenueTargetState] = useState<number>(() => {
     return parseFloat(localStorage.getItem("oab_monthly_target") || "0");
   });
+
+  const [darkMode, setDarkMode] = useState<boolean>(() => localStorage.getItem("oab_dark_mode") === "true");
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("oab_dark_mode", String(darkMode));
+  }, [darkMode]);
+  const toggleDarkMode = () => setDarkMode(v => !v);
 
   const setMonthlyRevenueTarget = (v: number) => {
     setMonthlyRevenueTargetState(v);
@@ -421,7 +430,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AppContext.Provider value={{
-      isAuthenticated, handleLogin, handleLogout,
+      isAuthenticated, handleLogin, handleLogout, darkMode, toggleDarkMode,
       transactions, priorityBills, clients, courtCosts,
       monthlyRevenueTarget, setMonthlyRevenueTarget,
       isLoadingCloud, syncStatus, isDemoMode,

@@ -22,10 +22,13 @@ function AppShell() {
 
   const [cmdOpen, setCmdOpen] = useState(false);
 
-  // Ctrl+K listener
+  // Ctrl+K + N shortcut listeners
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setCmdOpen(o => !o); }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") { e.preventDefault(); setCmdOpen(o => !o); return; }
+      const tag = (document.activeElement as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (e.key === "n" || e.key === "N") { e.preventDefault(); setTransactionToEdit(null); openModal(true); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
