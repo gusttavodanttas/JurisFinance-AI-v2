@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { Transaction, TransactionScope, TransactionType, PriorityBill } from "../types";
-import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, Sparkles, Building2, ChevronLeft, ChevronRight, PauseCircle } from "lucide-react";
+import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, TrendingDown, Sparkles, Building2, ChevronLeft, ChevronRight, PauseCircle, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface MonthlyReportProps {
@@ -53,6 +53,24 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
     .filter(t => t.scope === TransactionScope.PERSONAL && t.type === TransactionType.EXPENSE && (t.isAiCategorized || t.notes?.includes("IA") || t.notes?.toLowerCase().includes("escritório") || t.notes?.toLowerCase().includes("pj")))
     .reduce((acc, t) => acc + t.amount, 0);
 
+
+  // Previous month comparison
+  const prevMonthStr = (() => {
+    const [y, m] = currentReportMonth.split("-").map(Number);
+    const pm = m - 1 === 0 ? 12 : m - 1;
+    const py = m - 1 === 0 ? y - 1 : y;
+    return `${py}-${String(pm).padStart(2, "0")}`;
+  })();
+  const prevTx = transactions.filter(t => t.date.substring(0, 7) === prevMonthStr && t.status !== "PREVISTO");
+  const prevProfRev = prevTx.filter(t => t.scope === TransactionScope.PROFESSIONAL && t.type === TransactionType.REVENUE).reduce((s, t) => s + t.amount, 0);
+  const prevProfExp = prevTx.filter(t => t.scope === TransactionScope.PROFESSIONAL && t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+  const prevProfNet = prevProfRev - prevProfExp;
+  const hasPrevData = prevTx.length > 0;
+
+  const delta = (curr: number, prev: number) => {
+    if (prev === 0) return null;
+    return ((curr - prev) / prev) * 100;
+  };
 
   const handlePrint = () => {
     window.print();
@@ -177,6 +195,37 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
             <span>
               <strong>{previstoProfCount} lançamento{previstoProfCount > 1 ? "s" : ""} em PREVISTO</strong> ({formatCurrency(previstoProfRevTotal)} a receber) não entram nas métricas de liquidez abaixo. As métricas mostram apenas o que foi efetivamente recebido/pago.
             </span>
+          </div>
+        )}
+
+        {/* COMPARATIVO MÊS A MÊS */}
+        {hasPrevData && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Variação vs. mês anterior</p>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Receitas PJ", curr: realProfRevenue, prev: prevProfRev, positive: true },
+                { label: "Despesas PJ", curr: realProfExpense, prev: prevProfExp, positive: false },
+                { label: "Resultado PJ", curr: netProfProfit, prev: prevProfNet, positive: true },
+              ].map(({ label, curr, prev, positive }) => {
+                const d = delta(curr, prev);
+                const up = curr >= prev;
+                const Icon = d === null ? Minus : up ? ArrowUpRight : ArrowDownRight;
+                const good = positive ? up : !up;
+                const color = d === null ? "text-slate-400" : good ? "text-emerald-600" : "text-rose-600";
+                return (
+                  <div key={label} className="bg-white rounded-lg border border-slate-100 p-3 text-center">
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+                    <p className="text-sm font-black text-slate-800 font-mono">{formatCurrency(curr)}</p>
+                    <div className={`flex items-center justify-center gap-0.5 mt-1 text-[10px] font-bold ${color}`}>
+                      <Icon className="w-3 h-3" />
+                      {d !== null ? `${Math.abs(d).toFixed(1)}%` : "—"}
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-0.5">vs {formatCurrency(prev)}</p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

@@ -221,6 +221,11 @@ export default function MainContent() {
               onConfirmTransaction={handleConfirmTransaction}
               onEditTransaction={(tx) => { setTransactionToEdit(tx); setIsModalOpen(true); }}
               onTriggerNewTransaction={() => { setTransactionToEdit(null); setIsModalOpen(true); }}
+              onReconcileTransaction={(id) => {
+                const tx = transactions.find(t => t.id === id);
+                if (tx) handleUpdateTransaction({ ...tx, reconciled: !tx.reconciled });
+              }}
+              onImportTransactions={handleAddTransactions}
               onClearAllTransactions={() => setConfirmModal({
                 isOpen: true,
                 title: "Excluir todos os lançamentos?",

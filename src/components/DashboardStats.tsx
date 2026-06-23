@@ -212,6 +212,50 @@ export default function DashboardStats({ transactions, selectedMonth }: Dashboar
           </p>
         </div>
 
+        {/* KPI EXTRA: Indicador de Saúde Financeira */}
+        {(() => {
+          const avgMonthlyExp = pjExpReal > 0 ? pjExpReal : pjExpPrev;
+          const cashBalance = profBalanceReal > 0 ? profBalanceReal : (pjRevPrev - pjExpPrev);
+          const monthsCovered = avgMonthlyExp > 0 ? cashBalance / avgMonthlyExp : 0;
+          const getHealth = () => {
+            if (monthsCovered >= 3) return { label: "Saudável", grade: "A", cls: "text-emerald-600 bg-emerald-50 border-emerald-200", bar: "bg-emerald-500" };
+            if (monthsCovered >= 1.5) return { label: "Estável", grade: "B", cls: "text-blue-600 bg-blue-50 border-blue-200", bar: "bg-blue-500" };
+            if (monthsCovered >= 0.5) return { label: "Atenção", grade: "C", cls: "text-amber-600 bg-amber-50 border-amber-200", bar: "bg-amber-400" };
+            return { label: "Crítico", grade: "D", cls: "text-rose-600 bg-rose-50 border-rose-200", bar: "bg-rose-500" };
+          };
+          const health = getHealth();
+          const barWidth = Math.min((monthsCovered / 4) * 100, 100);
+          return (
+            <div className="bg-white rounded-2xl border border-slate-150 p-5 shadow-xs relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-20 h-20 bg-slate-50/80 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono flex items-center gap-1">
+                  Saúde Financeira
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-300 cursor-help" title="Quantos meses de despesas operacionais o saldo atual cobre." />
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold border ${health.cls}`}>{health.label}</span>
+                  <span className={`text-sm font-black rounded-lg px-2 py-0.5 border ${health.cls}`}>{health.grade}</span>
+                </div>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Meses cobertos pelo saldo</p>
+                <h3 className={`text-2xl font-black font-display tracking-tight ${health.cls.split(" ")[0]}`}>
+                  {monthsCovered >= 10 ? "10+" : monthsCovered.toFixed(1)}x
+                </h3>
+              </div>
+              <div className="mt-3 space-y-1">
+                <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full transition-all duration-500 ${health.bar}`} style={{ width: `${barWidth}%` }} />
+                </div>
+                <p className="text-[9px] text-slate-400 font-semibold font-sans">
+                  Base: {formatCurrency(avgMonthlyExp)}/mês em despesas operacionais
+                </p>
+              </div>
+            </div>
+          );
+        })()}
+
       </div>
 
       {/* LINHA 2: BATIMENTO DE PREVISTO x REALIZADO (RECEITAS E DESPESAS) */}

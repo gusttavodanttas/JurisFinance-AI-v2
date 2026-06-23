@@ -20,6 +20,7 @@ export interface Transaction {
   notes?: string;
   isAiCategorized?: boolean;
   status?: "PREVISTO" | "REALIZADO";
+  reconciled?: boolean;
 }
 
 export interface PriorityBill {

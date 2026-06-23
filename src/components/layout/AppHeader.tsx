@@ -1,10 +1,10 @@
 import React from "react";
-import { Plus, ChevronLeft, ChevronRight, Edit3, Menu } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Edit3, Menu, Search } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
 
-export default function AppHeader() {
+export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalette?: () => void }) {
   const {
     syncStatus, selectedMonth, setSelectedMonth,
     handlePrevMonth, handleNextMonth, generatedMonthsList,
@@ -92,6 +92,18 @@ export default function AppHeader() {
               <ChevronRight className="w-3 h-3" />
             </button>
           </div>
+
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              className="hidden md:flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-400 text-[11px] font-mono rounded-md transition-all cursor-pointer select-none"
+              title="Busca rápida (Ctrl+K)"
+            >
+              <Search className="w-3 h-3" />
+              <span>Buscar...</span>
+              <kbd className="text-[9px] bg-white border border-slate-200 px-1 py-0.5 rounded ml-1">Ctrl K</kbd>
+            </button>
+          )}
 
           <button
             id="header-new-record-btn"

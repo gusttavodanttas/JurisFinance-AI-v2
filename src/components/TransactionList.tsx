@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Transaction, TransactionScope, TransactionType, ALL_CATEGORIES_MAP } from "../types";
 import {
   Search,
@@ -17,7 +17,9 @@ import {
   Plus,
   Edit3,
   Check,
-  Download
+  Download,
+  Upload,
+  CheckCheck
 } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
@@ -50,6 +52,8 @@ interface TransactionListProps {
   onTriggerNewTransaction?: () => void;
   onClearAllTransactions?: () => void;
   onConfirmTransaction?: (id: string) => void;
+  onReconcileTransaction?: (id: string) => void;
+  onImportTransactions?: (items: Omit<Transaction, "id">[]) => void;
 }
 
 export default function TransactionList({
@@ -61,11 +65,18 @@ export default function TransactionList({
   onTriggerNewTransaction,
   onClearAllTransactions,
   onConfirmTransaction,
+  onReconcileTransaction,
+  onImportTransactions,
 }: TransactionListProps) {
   const [search, setSearch] = useState("");
   const [scopeFilter, setScopeFilter] = useState<"ALL" | TransactionScope>("ALL");
   const [typeFilter, setTypeFilter] = useState<"ALL" | TransactionType>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
+  const [csvImportRows, setCsvImportRows] = useState<Omit<Transaction, "id">[]>([]);
+  const [showCsvPreview, setShowCsvPreview] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get distinct list of available months in transactions, plus some key active months
   const monthsSet = new Set<string>(["2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09"]);
@@ -89,6 +100,41 @@ export default function TransactionList({
     )
   ).sort();
 
+  // Parse CSV file for import
+  const handleCsvFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      const sep = lines[0].includes(";") ? ";" : ",";
+      const rows: Omit<Transaction, "id">[] = [];
+      // Skip header line if first field looks like a label
+      const startIdx = isNaN(Date.parse(lines[0].split(sep)[0])) ? 1 : 0;
+      for (let i = startIdx; i < lines.length; i++) {
+        const cols = lines[i].split(sep).map(c => c.replace(/^"|"$/g, "").trim());
+        if (cols.length < 3) continue;
+        const rawDate = cols[0].includes("/") ? cols[0].split("/").reverse().join("-") : cols[0];
+        const desc = cols[1] || "Importado";
+        const rawVal = parseFloat(cols[2].replace(/[^\d.,-]/g, "").replace(",", "."));
+        if (isNaN(rawVal) || !rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) continue;
+        rows.push({
+          date: rawDate,
+          description: desc,
+          type: rawVal >= 0 ? TransactionType.REVENUE : TransactionType.EXPENSE,
+          scope: TransactionScope.PROFESSIONAL,
+          category: rawVal >= 0 ? "Outras Receitas Profissionais" : "Outras Despesas Profissionais",
+          amount: Math.abs(rawVal),
+          status: "REALIZADO" as const,
+          paymentMethod: cols[3] || undefined,
+          isAiCategorized: false,
+        });
+      }
+      setCsvImportRows(rows);
+      setShowCsvPreview(rows.length > 0);
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
   // Filter transactions
   const filteredTransactions = transactions.filter((t) => {
     const matchesMonth = selectedMonth === "ALL" || t.date.substring(0, 7) === selectedMonth;
@@ -99,8 +145,10 @@ export default function TransactionList({
       t.description.toLowerCase().includes(search.toLowerCase()) ||
       (t.notes && t.notes.toLowerCase().includes(search.toLowerCase())) ||
       t.category.toLowerCase().includes(search.toLowerCase());
+    const matchesDateFrom = !dateFrom || t.date >= dateFrom;
+    const matchesDateTo = !dateTo || t.date <= dateTo;
 
-    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch;
+    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo;
   });
 
 
@@ -167,7 +215,7 @@ export default function TransactionList({
       </div>
 
       {/* FILTER SEARCH CRITERIA ROW */}
-      <div id="filter-controls-row" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-lg mb-4">
+      <div id="filter-controls-row" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-lg mb-4">
         {/* Search */}
         <div className="relative">
           <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
@@ -234,7 +282,59 @@ export default function TransactionList({
             ))}
           </select>
         </div>
+
+        {/* Date From */}
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2 py-1.5">
+          <CalendarDays className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="w-full bg-transparent text-xs text-slate-500 focus:outline-none cursor-pointer"
+            placeholder="De" title="Data inicial" />
+        </div>
+
+        {/* Date To */}
+        <div className="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2 py-1.5">
+          <CalendarDays className="w-3 h-3 text-slate-400 flex-shrink-0" />
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="w-full bg-transparent text-xs text-slate-500 focus:outline-none cursor-pointer"
+            placeholder="Até" title="Data final" />
+        </div>
       </div>
+
+      {/* CSV Import Preview */}
+      {showCsvPreview && csvImportRows.length > 0 && (
+        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-lg p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-emerald-800">{csvImportRows.length} linhas detectadas no CSV — revise e importe</p>
+            <button onClick={() => { setShowCsvPreview(false); setCsvImportRows([]); }} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="max-h-40 overflow-y-auto space-y-1">
+            {csvImportRows.slice(0, 20).map((r, i) => (
+              <div key={i} className="flex items-center gap-2 text-[10px] font-mono bg-white border border-emerald-100 rounded px-2 py-1">
+                <span className="text-slate-400">{r.date}</span>
+                <span className="flex-1 truncate text-slate-700">{r.description}</span>
+                <span className={r.type === TransactionType.REVENUE ? "text-emerald-600 font-bold" : "text-rose-500 font-bold"}>
+                  {r.type === TransactionType.REVENUE ? "+" : "-"}{formatCurrency(r.amount)}
+                </span>
+              </div>
+            ))}
+            {csvImportRows.length > 20 && <p className="text-[10px] text-emerald-600 text-center">+ {csvImportRows.length - 20} linhas...</p>}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => { onImportTransactions?.(csvImportRows); setShowCsvPreview(false); setCsvImportRows([]); }}
+              className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+            >
+              <Check className="w-3.5 h-3.5" /> Importar {csvImportRows.length} lançamentos
+            </button>
+            <button onClick={() => { setShowCsvPreview(false); setCsvImportRows([]); }}
+              className="px-3 py-2 bg-white border border-slate-200 text-slate-500 text-xs rounded-lg cursor-pointer">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* FILTER VIEW SUMMARY METRICS */}
       <div id="filter-metrics-summary" className="grid grid-cols-2 md:grid-cols-4 gap-2.5 bg-slate-50/40 p-2.5 rounded mb-3 text-[10px] border border-[#e2e8f0]">
@@ -284,6 +384,20 @@ export default function TransactionList({
             <Download className="w-3.5 h-3.5" />
             Exportar CSV
           </button>
+          {onImportTransactions && (
+            <>
+              <input ref={fileInputRef} type="file" accept=".csv,.txt" className="hidden"
+                onChange={e => { const f = e.target.files?.[0]; if (f) handleCsvFile(f); e.target.value = ""; }} />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-blue-50 text-slate-500 hover:text-blue-700 border border-slate-200 hover:border-blue-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none"
+                title="Importar extrato bancário em CSV"
+              >
+                <Upload className="w-3.5 h-3.5" />
+                Importar CSV
+              </button>
+            </>
+          )}
           {onClearAllTransactions && transactions.length > 0 && (
             <button
               id="ledger-direct-clear-btn"
@@ -424,6 +538,16 @@ export default function TransactionList({
                             title={isRevenue ? "Confirmar recebimento (Marcar como recebido)" : "Confirmar pagamento (Marcar como pago)"}
                           >
                             <Check className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {onReconcileTransaction && t.status !== "PREVISTO" && (
+                          <button
+                            type="button"
+                            onClick={() => onReconcileTransaction(t.id)}
+                            className={`p-1 px-1.5 rounded transition-colors cursor-pointer ${t.reconciled ? "text-teal-600 bg-teal-50" : "text-slate-300 hover:text-teal-500 hover:bg-teal-50"}`}
+                            title={t.reconciled ? "Conciliado com extrato ✓" : "Marcar como conciliado com extrato bancário"}
+                          >
+                            <CheckCheck className="w-3.5 h-3.5" />
                           </button>
                         )}
                         {onEditTransaction && (

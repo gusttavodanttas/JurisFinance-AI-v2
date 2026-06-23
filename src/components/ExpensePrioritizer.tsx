@@ -49,6 +49,34 @@ export default function ExpensePrioritizer({
   const [payMethodVal, setPayMethodVal] = useState<string>("");
   const [confirmingBillId, setConfirmingBillId] = useState<string | null>(null);
 
+  // Auto-recurrence: detect when a new month has no bills but prev month had fixed ones
+  const [recurrencePrompt, setRecurrencePrompt] = useState<{ from: string; count: number } | null>(null);
+
+  useEffect(() => {
+    const currentBills = bills.filter(b => b.month === selectedMonth);
+    if (currentBills.length > 0) { setRecurrencePrompt(null); return; }
+    // Find previous month
+    const [y, m] = selectedMonth.split("-").map(Number);
+    const pm = m - 1 === 0 ? 12 : m - 1;
+    const py = m - 1 === 0 ? y - 1 : y;
+    const prevMonth = `${py}-${String(pm).padStart(2, "0")}`;
+    const prevFixed = bills.filter(b => b.month === prevMonth && b.status === "PAGAR");
+    if (prevFixed.length > 0) {
+      setRecurrencePrompt({ from: prevMonth, count: prevFixed.length });
+    } else {
+      setRecurrencePrompt(null);
+    }
+  }, [selectedMonth, bills]);
+
+  const handleCloneFromPrevMonth = () => {
+    if (!recurrencePrompt) return;
+    const cloned = bills
+      .filter(b => b.month === recurrencePrompt.from && b.status === "PAGAR")
+      .map(b => ({ ...b, id: `${b.id}_clone_${selectedMonth}`, month: selectedMonth, paid: false }));
+    onUpdateBills([...bills, ...cloned]);
+    setRecurrencePrompt(null);
+  };
+
   const getDueDateStatus = (bill: PriorityBill) => {
     if (!bill.dueDay || !bill.month) return null;
     const dueDate = new Date(`${bill.month}-${String(bill.dueDay).padStart(2, "0")}`);
@@ -411,6 +439,28 @@ export default function ExpensePrioritizer({
 
   return (
     <div id="expense-prioritizer" className="space-y-6">
+
+      {/* AUTO-RECURRENCE PROMPT */}
+      {recurrencePrompt && (
+        <div className="flex items-center justify-between gap-4 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm">
+          <div className="flex items-center gap-2.5">
+            <CalendarDays className="w-4 h-4 text-amber-600 flex-shrink-0" />
+            <p className="text-xs text-amber-800">
+              <strong>{recurrencePrompt.count} despesas fixas</strong> do mês anterior detectadas. Deseja copiá-las para {selectedMonth.split("-").reverse().join("/")}?
+            </p>
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <button onClick={handleCloneFromPrevMonth}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg cursor-pointer">
+              Sim, copiar
+            </button>
+            <button onClick={() => setRecurrencePrompt(null)}
+              className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 text-xs rounded-lg cursor-pointer">
+              Não
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div className="bg-slate-900 border-l-4 border-[#8b5cf6] p-4 text-white rounded-r-lg shadow-sm">
