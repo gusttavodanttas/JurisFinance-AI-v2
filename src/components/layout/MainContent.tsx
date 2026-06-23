@@ -57,25 +57,30 @@ export default function MainContent() {
   const [y, m] = targetMonth.split("-");
   const readableMonth = `${PT_MONTHS_LONG[parseInt(m) - 1]} de ${y}`;
 
-  // Merge unpaid priority bills as PREVISTO expenses into the ledger view
+  // Merge only PAGAR (priority) bills as PREVISTO expenses — ESPERAR bills are excluded from totals
   const transactionsWithBills = useMemo<Transaction[]>(() => {
     const billTxs: Transaction[] = priorityBills
-      .filter(b => !b.paid && b.month === targetMonth)
+      .filter(b => !b.paid && b.month === targetMonth && b.status === "PAGAR")
       .map(b => ({
         id: `bill_${b.id}`,
-        date: `${targetMonth}-01`,
+        date: b.dueDay ? `${targetMonth}-${String(b.dueDay).padStart(2, "0")}` : `${targetMonth}-01`,
         description: b.description,
         type: TransactionType.EXPENSE,
         scope: b.scope,
         category: b.category || (b.scope === TransactionScope.PROFESSIONAL ? "Outras Despesas Profissionais" : "Outras Despesas Pessoais"),
         amount: b.amount,
-        paymentMethod: "—",
+        paymentMethod: b.paymentMethod || "—",
         notes: b.notes,
         status: "PREVISTO" as const,
         isAiCategorized: false,
       }));
     return [...transactions, ...billTxs];
   }, [transactions, priorityBills, targetMonth]);
+
+  // ESPERAR bills — shown separately in reports, not counted in previsto totals
+  const waitingBills = useMemo(() =>
+    priorityBills.filter(b => !b.paid && b.month === targetMonth && b.status === "ESPERAR"),
+  [priorityBills, targetMonth]);
 
   return (
     <main className="flex-grow p-4 lg:p-6 space-y-6 relative">
@@ -208,7 +213,7 @@ export default function MainContent() {
               title="Relatório Consolidado para Contabilidade"
               subtitle="Gere resumos analíticos prontos para exportar ou imprimir"
             />
-            <MonthlyReport transactions={transactionsWithBills} selectedMonth={selectedMonth} onSetSelectedMonth={setSelectedMonth} />
+            <MonthlyReport transactions={transactionsWithBills} selectedMonth={selectedMonth} onSetSelectedMonth={setSelectedMonth} waitingBills={waitingBills} />
           </div>
         )}
 

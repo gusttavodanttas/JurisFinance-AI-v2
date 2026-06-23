@@ -1,15 +1,16 @@
 import React, { useRef } from "react";
-import { Transaction, TransactionScope, TransactionType } from "../types";
-import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, Sparkles, Building2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Transaction, TransactionScope, TransactionType, PriorityBill } from "../types";
+import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, Sparkles, Building2, ChevronLeft, ChevronRight, PauseCircle } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface MonthlyReportProps {
   transactions: Transaction[];
   selectedMonth: string;
   onSetSelectedMonth?: (month: string) => void;
+  waitingBills?: PriorityBill[];
 }
 
-export default function MonthlyReport({ transactions, selectedMonth, onSetSelectedMonth }: MonthlyReportProps) {
+export default function MonthlyReport({ transactions, selectedMonth, onSetSelectedMonth, waitingBills = [] }: MonthlyReportProps) {
   // If no specific month, fallback to the latest month present or default
   const availableMonths = Array.from(new Set(transactions.map(t => t.date.substring(0, 7)))).sort().reverse();
   const currentReportMonth = selectedMonth === "ALL" ? (availableMonths[0] || "2026-06") : selectedMonth;
@@ -272,6 +273,55 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
             )}
           </p>
         </div>
+
+        {/* DESPESAS RETIDAS (ESPERAR) */}
+        {waitingBills.length > 0 && (() => {
+          const totalWaiting = waitingBills.reduce((s, b) => s + b.amount, 0);
+          const pjWaiting = waitingBills.filter(b => b.scope === TransactionScope.PROFESSIONAL);
+          const pfWaiting = waitingBills.filter(b => b.scope === TransactionScope.PERSONAL);
+          const totalPjWaiting = pjWaiting.reduce((s, b) => s + b.amount, 0);
+          const totalPfWaiting = pfWaiting.reduce((s, b) => s + b.amount, 0);
+          return (
+            <div className="border border-amber-200 rounded-xl overflow-hidden">
+              <div className="bg-amber-50 px-4 py-3 flex items-center justify-between border-b border-amber-200">
+                <div className="flex items-center gap-2">
+                  <PauseCircle className="w-4 h-4 text-amber-600" />
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Despesas Retidas — Aguardando Caixa</h4>
+                    <p className="text-[10px] text-amber-600 mt-0.5">Lançamentos em ESPERAR: não entram nos totais de despesa prevista acima</p>
+                  </div>
+                </div>
+                <span className="text-sm font-black text-amber-700 font-mono">{formatCurrency(totalWaiting)}</span>
+              </div>
+
+              <div className="bg-white divide-y divide-slate-100">
+                {waitingBills.map(b => (
+                  <div key={b.id} className="flex items-center justify-between px-4 py-2.5 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                        b.scope === TransactionScope.PROFESSIONAL
+                          ? "bg-indigo-50 text-indigo-700 border-indigo-100"
+                          : "bg-sky-50 text-sky-700 border-sky-100"
+                      }`}>
+                        {b.scope === TransactionScope.PROFESSIONAL ? "PJ" : "PF"}
+                      </span>
+                      <span className="truncate text-slate-700 font-medium">{b.description}</span>
+                      {b.category && <span className="hidden sm:inline text-slate-400 text-[10px] shrink-0">— {b.category}</span>}
+                    </div>
+                    <span className="font-mono font-bold text-amber-700 shrink-0 ml-3">{formatCurrency(b.amount)}</span>
+                  </div>
+                ))}
+              </div>
+
+              {(pjWaiting.length > 0 && pfWaiting.length > 0) && (
+                <div className="bg-amber-50/60 px-4 py-2.5 border-t border-amber-100 flex gap-6 text-[10px] text-amber-700 font-mono font-bold">
+                  {pjWaiting.length > 0 && <span>PJ retido: {formatCurrency(totalPjWaiting)}</span>}
+                  {pfWaiting.length > 0 && <span>PF retido: {formatCurrency(totalPfWaiting)}</span>}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Signatures for Print and Law firm Seal */}
         <div id="printable-signature" className="hidden printing:flex justify-between items-center pt-10 text-slate-500 text-[10px]">
