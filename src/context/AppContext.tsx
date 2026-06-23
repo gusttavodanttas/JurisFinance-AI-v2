@@ -263,7 +263,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   };
 
   const handleConfirmTransaction = (id: string) => {
-    setTransactions(prev => prev.map(t => t.id === id ? { ...t, status: "REALIZADO" } : t));
+    setTransactions(prev => {
+      const tx = prev.find(t => t.id === id);
+      if (!tx) return prev;
+      const confirmed = prev.map(t => t.id === id ? { ...t, status: "REALIZADO" as const } : t);
+      // Auto-generate next monthly occurrence for recurring transactions
+      if (tx.recurring) {
+        const [y, m, d] = tx.date.split("-").map(Number);
+        const next = new Date(y, m, d); // month is 0-indexed so m (not m-1) = next month
+        const nextDate = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+        // Only create if no future recurrence with same recurringGroupId already exists
+        const groupId = tx.recurringGroupId ?? tx.id;
+        const alreadyExists = confirmed.some(t =>
+          t.recurringGroupId === groupId && t.date >= nextDate && t.status === "PREVISTO"
+        );
+        if (!alreadyExists) {
+          const nextTx: Transaction = {
+            ...tx,
+            id: "tx-rec-" + Math.random().toString(36).substring(2, 11),
+            date: nextDate,
+            status: "PREVISTO",
+            recurringGroupId: groupId,
+          };
+          return [nextTx, ...confirmed];
+        }
+      }
+      return confirmed;
+    });
   };
 
   const handleDeleteTransaction = (id: string) => {

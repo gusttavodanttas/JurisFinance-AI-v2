@@ -22,6 +22,8 @@ export interface Transaction {
   status?: "PREVISTO" | "REALIZADO";
   reconciled?: boolean;
   clientName?: string;
+  recurring?: boolean;       // auto-generate next occurrence on confirm
+  recurringGroupId?: string; // groups installments/recurrences together
 }
 
 export interface Client {

@@ -7,6 +7,7 @@ import { useApp } from "../../context/AppContext";
 import DashboardStats from "../DashboardStats";
 import CashFlowChart from "../CashFlowChart";
 import CategoryPieChart from "../CategoryPieChart";
+import DueCalendar from "../DueCalendar";
 
 // Lazy-loaded (loaded on first tab visit)
 const AISeparator = lazy(() => import("../AISeparator"));
@@ -191,7 +192,14 @@ export default function MainContent() {
                   </div>
                 </div>
               </div>
-              <CategoryPieChart transactions={transactionsWithBills} selectedMonth={selectedMonth} />
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                <div className="xl:col-span-2">
+                  <CategoryPieChart transactions={transactionsWithBills} selectedMonth={selectedMonth} />
+                </div>
+                <div className="xl:col-span-1">
+                  <DueCalendar transactions={transactions} />
+                </div>
+              </div>
             </div>
           )}
 

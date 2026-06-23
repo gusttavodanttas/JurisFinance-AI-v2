@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Client, Transaction, TransactionType, TransactionScope } from "../types";
-import { Users, Plus, Trash2, Edit3, Phone, Mail, FileText, TrendingUp, Clock, Check, X, ExternalLink } from "lucide-react";
+import { Users, Plus, Trash2, Edit3, Phone, Mail, FileText, TrendingUp, Clock, Check, X, ExternalLink, Printer } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface ClientsTabProps {
@@ -190,8 +190,58 @@ export default function ClientsTab({ clients, transactions, onAddClient, onUpdat
                     <p className="text-[10px] text-slate-400">Extrato completo de lançamentos</p>
                   </div>
                 </div>
-                <button onClick={() => setStatementClient(null)} className="text-slate-400 hover:text-white transition cursor-pointer"><X className="w-5 h-5" /></button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      // Print the statement modal content
+                      const printContent = document.getElementById("client-statement-print");
+                      if (!printContent) return;
+                      const win = window.open("", "_blank", "width=700,height=900");
+                      if (!win) return;
+                      win.document.write(`<html><head><title>Extrato — ${statementClient.name}</title>
+                        <style>body{font-family:sans-serif;font-size:12px;color:#1e293b;padding:24px;}
+                        h2{margin:0 0 4px}p{margin:2px 0}.kpi{display:flex;gap:24px;margin:16px 0;padding:12px;border:1px solid #e2e8f0;border-radius:8px;}
+                        .kpi-item{flex:1;text-align:center}.kpi-label{font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:bold}
+                        .kpi-value{font-size:20px;font-weight:900;font-family:monospace}.tx-row{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;align-items:center}
+                        .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.green{background:#10b981}.red{background:#f43f5e}
+                        .tx-desc{flex:1}.tx-date{color:#94a3b8;font-size:10px}.tx-amount{font-family:monospace;font-weight:bold}
+                        </style></head><body>`);
+                      win.document.write(printContent.innerHTML);
+                      win.document.write("</body></html>");
+                      win.document.close();
+                      win.focus();
+                      setTimeout(() => { win.print(); win.close(); }, 300);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition cursor-pointer border border-white/20">
+                    <Printer className="w-3.5 h-3.5" /> PDF
+                  </button>
+                  <button onClick={() => setStatementClient(null)} className="text-slate-400 hover:text-white transition cursor-pointer"><X className="w-5 h-5" /></button>
+                </div>
               </div>
+              {/* Printable area */}
+              <div id="client-statement-print" style={{ display: "none" }}>
+                <h2>{statementClient.name}</h2>
+                <p style={{ color: "#94a3b8", fontSize: 10 }}>Extrato completo de lançamentos</p>
+                <div className="kpi">
+                  <div className="kpi-item"><div className="kpi-label">Recebido</div><div className="kpi-value" style={{ color: "#059669" }}>R$ {totalRec.toFixed(2)}</div></div>
+                  <div className="kpi-item"><div className="kpi-label">A Receber</div><div className="kpi-value" style={{ color: "#d97706" }}>R$ {totalPend.toFixed(2)}</div></div>
+                  <div className="kpi-item"><div className="kpi-label">Custos</div><div className="kpi-value" style={{ color: "#e11d48" }}>R$ {totalExp.toFixed(2)}</div></div>
+                </div>
+                {clientTxs.map(t => (
+                  <div key={t.id} className="tx-row">
+                    <div className={`dot ${t.type === TransactionType.REVENUE ? "green" : "red"}`} />
+                    <div className="tx-desc">
+                      <div>{t.description}</div>
+                      <div className="tx-date">{t.date.split("-").reverse().join("/")} · {t.category}</div>
+                    </div>
+                    <div className={`tx-amount`} style={{ color: t.type === TransactionType.REVENUE ? "#059669" : "#e11d48" }}>
+                      {t.type === TransactionType.REVENUE ? "+" : "-"}R$ {t.amount.toFixed(2)}
+                      {t.status === "PREVISTO" ? " (Prev)" : ""}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
               {/* KPIs */}
               <div className="grid grid-cols-3 gap-px bg-slate-100 border-b border-slate-200">
                 {[

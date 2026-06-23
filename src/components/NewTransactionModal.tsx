@@ -42,6 +42,7 @@ export default function NewTransactionModal({
   const [status, setStatus] = useState<"PREVISTO" | "REALIZADO">("REALIZADO");
   const [repeat, setRepeat] = useState(false);
   const [repeatCount, setRepeatCount] = useState(2);
+  const [recurring, setRecurring] = useState(false);
 
   // Bulk form state
   const [bulkRows, setBulkRows] = useState<BulkRow[]>([defaultBulkRow(), defaultBulkRow(), defaultBulkRow()]);
@@ -91,7 +92,7 @@ export default function NewTransactionModal({
     } else {
       setDate(new Date().toISOString().split("T")[0]);
       setDescription(""); setAmount(""); setPaymentMethod("PIX"); setNotes("");
-      setIsMixedIncident(false); setStatus("REALIZADO"); setRepeat(false); setRepeatCount(2);
+      setIsMixedIncident(false); setStatus("REALIZADO"); setRepeat(false); setRepeatCount(2); setRecurring(false);
       setScope(TransactionScope.PROFESSIONAL); setType(TransactionType.EXPENSE);
       setBulkRows([defaultBulkRow(), defaultBulkRow(), defaultBulkRow()]);
     }
@@ -127,7 +128,8 @@ export default function NewTransactionModal({
       });
       onSaveBulk(items);
     } else {
-      onSave({ date, description, type, scope, category, amount: parseFloat(amount), paymentMethod, notes: actualNotes, isAiCategorized: isMixedIncident, status });
+      const recurringGroupId = recurring ? "rg-" + Math.random().toString(36).substring(2, 11) : undefined;
+      onSave({ date, description, type, scope, category, amount: parseFloat(amount), paymentMethod, notes: actualNotes, isAiCategorized: isMixedIncident, status, recurring: recurring || undefined, recurringGroupId });
     }
     setDescription(""); setAmount(""); setNotes(""); setIsMixedIncident(false);
     setDate(new Date().toISOString().split("T")[0]);
@@ -209,6 +211,7 @@ export default function NewTransactionModal({
             status={status} setStatus={setStatus}
             repeat={repeat} setRepeat={setRepeat}
             repeatCount={repeatCount} setRepeatCount={setRepeatCount}
+            recurring={recurring} setRecurring={setRecurring}
             matchedCategoriesList={matchedCategoriesList}
             onSubmit={handleSingleSubmit}
             onClose={onClose}

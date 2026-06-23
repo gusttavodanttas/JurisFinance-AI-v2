@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Transaction, TransactionScope, TransactionType } from "../types";
-import { Printer, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { Printer } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
 
 interface DRETabProps {
@@ -12,8 +12,11 @@ const PT_MONTHS_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","
 export default function DRETab({ transactions }: DRETabProps) {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
+  const [showComparison, setShowComparison] = useState(false);
 
+  const prevYear = year - 1;
   const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const prevMonths = Array.from({ length: 12 }, (_, i) => `${prevYear}-${String(i + 1).padStart(2, "0")}`);
   const availableYears = Array.from(new Set(transactions.map(t => t.date?.substring(0, 4)).filter(Boolean))).sort().reverse();
 
   const calc = (month: string) => {
@@ -31,6 +34,18 @@ export default function DRETab({ transactions }: DRETabProps) {
   };
 
   const monthData = months.map(m => ({ month: m, ...calc(m) }));
+  const prevMonthData = prevMonths.map(m => ({ month: m, ...calc(m) }));
+  const prevTotals = prevMonthData.reduce((acc, m) => ({
+    profRev: acc.profRev + m.profRev,
+    persRev: acc.persRev + m.persRev,
+    grossRev: acc.grossRev + m.grossRev,
+    taxes: acc.taxes + m.taxes,
+    netRev: acc.netRev + m.netRev,
+    profExp: acc.profExp + m.profExp,
+    persExp: acc.persExp + m.persExp,
+    totalExp: acc.totalExp + m.totalExp,
+    ebitda: acc.ebitda + m.ebitda,
+  }), { profRev: 0, persRev: 0, grossRev: 0, taxes: 0, netRev: 0, profExp: 0, persExp: 0, totalExp: 0, ebitda: 0 });
   const totals = monthData.reduce((acc, m) => ({
     profRev: acc.profRev + m.profRev,
     persRev: acc.persRev + m.persRev,
@@ -76,6 +91,10 @@ export default function DRETab({ transactions }: DRETabProps) {
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
+            <button onClick={() => setShowComparison(v => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg cursor-pointer border transition-colors ${showComparison ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-slate-600 border-slate-200 hover:border-indigo-400"}`}>
+              ± vs {prevYear}
+            </button>
             <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg cursor-pointer">
               <Printer className="w-3.5 h-3.5" /> Imprimir
             </button>
@@ -91,10 +110,18 @@ export default function DRETab({ transactions }: DRETabProps) {
                   <th key={m} className="py-2.5 px-2 text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono whitespace-nowrap">{m}</th>
                 ))}
                 <th className="py-2.5 px-3 text-right text-[9px] font-bold text-indigo-600 uppercase tracking-wider font-mono">TOTAL {year}</th>
+                {showComparison && <>
+                  <th className="py-2.5 px-3 text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">{prevYear}</th>
+                  <th className="py-2.5 px-3 text-right text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">VAR %</th>
+                </>}
               </tr>
             </thead>
             <tbody>
-              {rows.map(({ key, label, indent, highlight, border }) => (
+              {rows.map(({ key, label, indent, highlight, border }) => {
+                const prev = prevTotals[key] as number;
+                const curr = totals[key] as number;
+                const varPct = prev !== 0 ? ((curr - prev) / Math.abs(prev)) * 100 : null;
+                return (
                 <tr key={key} className={`${border ? "border-t-2 border-slate-200" : "border-t border-slate-50"} ${highlight ? "bg-slate-50 font-bold" : "hover:bg-slate-50/50"}`}>
                   <td className={`py-2 px-3 text-slate-700 whitespace-nowrap ${indent ? "pl-6 text-slate-500 font-normal" : "font-bold text-[10px] uppercase tracking-wide text-slate-700"}`}>
                     {label}
@@ -105,10 +132,21 @@ export default function DRETab({ transactions }: DRETabProps) {
                     </td>
                   ))}
                   <td className={`py-2 px-3 text-right text-[10px] ${highlight ? "font-black" : ""}`}>
-                    {totals[key] !== 0 ? fmt(totals[key], key) : <span className="text-slate-200 font-mono">—</span>}
+                    {curr !== 0 ? fmt(curr, key) : <span className="text-slate-200 font-mono">—</span>}
                   </td>
+                  {showComparison && <>
+                    <td className="py-2 px-3 text-right text-[10px] text-slate-400 font-mono">
+                      {prev !== 0 ? fmt(prev, key) : <span className="text-slate-200">—</span>}
+                    </td>
+                    <td className="py-2 px-3 text-right text-[10px] font-bold font-mono">
+                      {varPct !== null
+                        ? <span className={varPct >= 0 ? "text-emerald-600" : "text-rose-600"}>{varPct >= 0 ? "+" : ""}{varPct.toFixed(1)}%</span>
+                        : <span className="text-slate-300">—</span>}
+                    </td>
+                  </>}
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

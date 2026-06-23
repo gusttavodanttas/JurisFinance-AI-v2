@@ -476,6 +476,59 @@ export default function DashboardStats({ transactions, allTransactions, selected
         </div>
       )}
 
+      {/* ── PROJEÇÃO DE LUCRO ──────────────────────────────────────────────── */}
+      {selectedMonth !== "ALL" && (() => {
+        const [py, pm] = selectedMonth.split("-").map(Number);
+        const now = new Date();
+        const isCurrentMonth = now.getFullYear() === py && (now.getMonth() + 1) === pm;
+        if (!isCurrentMonth) return null;
+
+        const dayOfMonth = now.getDate();
+        const daysInMonth = new Date(py, pm, 0).getDate();
+        const daysLeft = daysInMonth - dayOfMonth;
+        if (dayOfMonth < 3) return null; // needs at least 3 days of data
+
+        const realizedRev = monthTx.filter(t => t.type === TransactionType.REVENUE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0);
+        const realizedExp = monthTx.filter(t => t.type === TransactionType.EXPENSE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0);
+        const dailyRevRate = realizedRev / dayOfMonth;
+        const dailyExpRate = realizedExp / dayOfMonth;
+        const projRev = realizedRev + dailyRevRate * daysLeft;
+        const projExp = realizedExp + dailyExpRate * daysLeft;
+        const projResult = projRev - projExp;
+        const currentResult = realizedRev - realizedExp;
+        const isPositive = projResult >= 0;
+
+        return (
+          <div className="bg-white rounded-2xl border border-indigo-100 p-5 shadow-xs">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-1.5 bg-indigo-50 rounded-lg"><TrendingUp className="w-4 h-4 text-indigo-500" /></div>
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Projeção de Fechamento do Mês</p>
+                <p className="text-xs font-bold text-slate-700">Baseada nos últimos {dayOfMonth} dias · {daysLeft} dias restantes</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Receita Projetada</p>
+                <p className="text-lg font-black font-mono text-emerald-600">{formatCurrency(projRev)}</p>
+                <p className="text-[9px] text-slate-400 font-mono mt-0.5">Atual: {formatCurrency(realizedRev)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Despesa Projetada</p>
+                <p className="text-lg font-black font-mono text-rose-600">{formatCurrency(projExp)}</p>
+                <p className="text-[9px] text-slate-400 font-mono mt-0.5">Atual: {formatCurrency(realizedExp)}</p>
+              </div>
+              <div>
+                <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider mb-1">Resultado Projetado</p>
+                <p className={`text-lg font-black font-mono ${isPositive ? "text-blue-600" : "text-rose-600"}`}>{formatCurrency(projResult)}</p>
+                <p className="text-[9px] text-slate-400 font-mono mt-0.5">Atual: {formatCurrency(currentResult)}</p>
+              </div>
+            </div>
+            <p className="text-[9px] text-slate-400 mt-3 font-mono italic">* Extrapolação linear do ritmo atual. Não considera lançamentos futuros já agendados.</p>
+          </div>
+        );
+      })()}
+
       {/* ── DUE ALERTS ─────────────────────────────────────────────────────── */}
       {(dueAlerts.length > 0 || overdueTxs.length > 0) && (
         <div className="bg-white rounded-2xl border border-amber-200 shadow-xs overflow-hidden">

@@ -16,6 +16,7 @@ interface SingleEntryFormProps {
   status: "PREVISTO" | "REALIZADO"; setStatus: (v: "PREVISTO" | "REALIZADO") => void;
   repeat: boolean; setRepeat: (v: boolean) => void;
   repeatCount: number; setRepeatCount: (v: number) => void;
+  recurring: boolean; setRecurring: (v: boolean) => void;
   matchedCategoriesList: string[];
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
@@ -27,7 +28,7 @@ export default function SingleEntryForm({
   amount, setAmount, paymentMethod, setPaymentMethod,
   notes, setNotes, isMixedIncident, setIsMixedIncident,
   status, setStatus, repeat, setRepeat, repeatCount, setRepeatCount,
-  matchedCategoriesList, onSubmit, onClose,
+  recurring, setRecurring, matchedCategoriesList, onSubmit, onClose,
 }: SingleEntryFormProps) {
   return (
     <form onSubmit={onSubmit} className="p-5 space-y-4 font-sans" id="single-entry-form">
@@ -138,26 +139,41 @@ export default function SingleEntryForm({
           className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs focus:ring-1 focus:ring-indigo-500 min-h-[50px] text-slate-800" />
       </div>
 
-      {/* Parcelamento */}
+      {/* Parcelamento / Recorrência */}
       {!isEditMode && (
-        <div className={`rounded-lg border p-3 transition-colors ${repeat ? "bg-indigo-50 border-indigo-200" : "bg-slate-50 border-slate-200"}`}>
-          <label className="flex items-center gap-2.5 cursor-pointer select-none">
-            <input type="checkbox" checked={repeat} onChange={e => setRepeat(e.target.checked)}
-              className="rounded accent-indigo-600 w-3.5 h-3.5 cursor-pointer" />
-            <Repeat className={`w-3.5 h-3.5 ${repeat ? "text-indigo-600" : "text-slate-400"}`} />
-            <span className={`text-xs font-bold ${repeat ? "text-indigo-800" : "text-slate-600"}`}>Repetir mensalmente (parcelamento)</span>
-          </label>
-          {repeat && (
-            <div className="mt-2.5 flex items-center gap-3 pl-6">
-              <span className="text-[10px] text-slate-500 font-mono">Repetir por</span>
-              <input type="number" min={2} max={60} value={repeatCount} onChange={e => setRepeatCount(Math.max(2, Math.min(60, parseInt(e.target.value) || 2)))}
-                className="w-16 border border-indigo-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-indigo-800 focus:outline-none focus:border-indigo-400 bg-white text-center" />
-              <span className="text-[10px] text-slate-500 font-mono">meses (parcelas)</span>
-              <span className="text-[10px] text-indigo-600 font-bold bg-indigo-100 px-2 py-0.5 rounded font-mono">
-                {repeatCount}× {amount ? `R$ ${(parseFloat(amount) || 0).toFixed(2)}` : "R$ 0,00"}
-              </span>
-            </div>
-          )}
+        <div className="space-y-2">
+          {/* Parcelamento */}
+          <div className={`rounded-lg border p-3 transition-colors ${repeat ? "bg-indigo-50 border-indigo-200" : "bg-slate-50 border-slate-200"}`}>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={repeat} onChange={e => { setRepeat(e.target.checked); if (e.target.checked) setRecurring(false); }}
+                className="rounded accent-indigo-600 w-3.5 h-3.5 cursor-pointer" />
+              <Repeat className={`w-3.5 h-3.5 ${repeat ? "text-indigo-600" : "text-slate-400"}`} />
+              <span className={`text-xs font-bold ${repeat ? "text-indigo-800" : "text-slate-600"}`}>Parcelar em X meses (prazo definido)</span>
+            </label>
+            {repeat && (
+              <div className="mt-2.5 flex items-center gap-3 pl-6">
+                <span className="text-[10px] text-slate-500 font-mono">Número de parcelas</span>
+                <input type="number" min={2} max={60} value={repeatCount} onChange={e => setRepeatCount(Math.max(2, Math.min(60, parseInt(e.target.value) || 2)))}
+                  className="w-16 border border-indigo-200 rounded-lg px-2 py-1 text-xs font-mono font-bold text-indigo-800 focus:outline-none focus:border-indigo-400 bg-white text-center" />
+                <span className="text-[10px] text-indigo-600 font-bold bg-indigo-100 px-2 py-0.5 rounded font-mono">
+                  {repeatCount}× {amount ? `R$ ${(parseFloat(amount) || 0).toFixed(2)}` : "R$ 0,00"} = {amount ? `R$ ${((parseFloat(amount) || 0) * repeatCount).toFixed(2)}` : "R$ 0,00"}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Recorrência sem prazo */}
+          <div className={`rounded-lg border p-3 transition-colors ${recurring ? "bg-teal-50 border-teal-200" : "bg-slate-50 border-slate-200"}`}>
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input type="checkbox" checked={recurring} onChange={e => { setRecurring(e.target.checked); if (e.target.checked) setRepeat(false); }}
+                className="rounded accent-teal-600 w-3.5 h-3.5 cursor-pointer" />
+              <Repeat className={`w-3.5 h-3.5 ${recurring ? "text-teal-600" : "text-slate-400"}`} />
+              <div>
+                <span className={`text-xs font-bold ${recurring ? "text-teal-800" : "text-slate-600"}`}>Recorrente mensal (sem prazo)</span>
+                {recurring && <p className="text-[10px] text-teal-600 mt-0.5">Ao confirmar cada mês, o próximo é criado automaticamente como PREVISTO.</p>}
+              </div>
+            </label>
+          </div>
         </div>
       )}
 
