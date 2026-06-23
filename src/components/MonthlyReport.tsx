@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Transaction, TransactionScope, TransactionType, PriorityBill } from "../types";
 import { Printer, CalendarDays, FileSpreadsheet, Percent, Scale, TrendingUp, TrendingDown, Sparkles, Building2, ChevronLeft, ChevronRight, PauseCircle, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { formatCurrency } from "../utils/currency";
@@ -88,6 +88,19 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
   const groupedProfRevenues = groupByCategory(profRevenues);
   const groupedProfExpenses = groupByCategory(profExpenses);
 
+  const [viewMode, setViewMode] = useState<"monthly" | "annual">("monthly");
+  const currentYear = currentReportMonth.substring(0, 4);
+  const PT_MONTHS_SHORT = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+
+  const annualMonths = Array.from({ length: 12 }, (_, i) => `${currentYear}-${String(i + 1).padStart(2, "0")}`);
+  const annualData = annualMonths.map(m => {
+    const txs = transactions.filter(t => t.date.substring(0, 7) === m && t.status !== "PREVISTO");
+    const rev = txs.filter(t => t.type === TransactionType.REVENUE).reduce((s, t) => s + t.amount, 0);
+    const exp = txs.filter(t => t.type === TransactionType.EXPENSE).reduce((s, t) => s + t.amount, 0);
+    return { month: m, rev, exp, net: rev - exp };
+  });
+  const annualTotals = annualData.reduce((acc, m) => ({ rev: acc.rev + m.rev, exp: acc.exp + m.exp, net: acc.net + m.net }), { rev: 0, exp: 0, net: 0 });
+
   return (
     <div id="monthly-reporting-widget" className="bg-white rounded-xl border border-slate-100 p-6 shadow-xs space-y-6">
       {/* Top Controls Banner */}
@@ -102,17 +115,88 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
           </p>
         </div>
 
-        <div className="flex gap-2 self-end">
+        <div className="flex gap-2 self-end flex-wrap">
+          <div className="flex gap-1 bg-slate-50 border border-slate-200 rounded-lg p-1">
+            <button onClick={() => setViewMode("monthly")} className={`px-3 py-1 text-[10px] font-bold rounded transition cursor-pointer ${viewMode === "monthly" ? "bg-white shadow text-indigo-700" : "text-slate-500 hover:text-slate-700"}`}>Mensal</button>
+            <button onClick={() => setViewMode("annual")} className={`px-3 py-1 text-[10px] font-bold rounded transition cursor-pointer ${viewMode === "annual" ? "bg-white shadow text-indigo-700" : "text-slate-500 hover:text-slate-700"}`}>Consolidado Anual</button>
+          </div>
           <button
             id="print-report-btn"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 bg-slate-950 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-all shadow-xs"
+            className="flex items-center gap-1.5 px-4 py-2 bg-slate-950 hover:bg-slate-900 text-white text-xs font-bold rounded-lg transition-all shadow-xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5" />
             Imprimir Relatório (PDF)
           </button>
         </div>
       </div>
+
+      {/* ANNUAL CONSOLIDATED VIEW */}
+      {viewMode === "annual" && (
+        <div className="space-y-4">
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono mb-1">Consolidado Anual</p>
+            <h3 className="text-sm font-bold text-slate-900">Resumo de 12 meses — {currentYear}</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mb-2">
+            {[
+              { label: "Receitas Totais", value: annualTotals.rev, color: "text-emerald-600" },
+              { label: "Despesas Totais", value: annualTotals.exp, color: "text-rose-600" },
+              { label: "Resultado Líquido", value: annualTotals.net, color: annualTotals.net >= 0 ? "text-indigo-600" : "text-rose-600" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="bg-slate-50 rounded-xl border border-slate-100 p-4">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest font-mono mb-1">{label}</p>
+                <p className={`text-xl font-black ${color}`}>{formatCurrency(value)}</p>
+              </div>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50 text-[9px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                  <th className="py-2.5 px-3 text-left">Mês</th>
+                  <th className="py-2.5 px-3 text-right">Receitas</th>
+                  <th className="py-2.5 px-3 text-right">Despesas</th>
+                  <th className="py-2.5 px-3 text-right">Resultado</th>
+                  <th className="py-2.5 px-3 text-left">Barra</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {annualData.map((m, i) => {
+                  const maxVal = Math.max(...annualData.map(x => Math.max(x.rev, x.exp)), 1);
+                  return (
+                    <tr key={m.month} className={m.month === currentReportMonth ? "bg-indigo-50/50" : "hover:bg-slate-50/50"}>
+                      <td className="py-2 px-3 font-bold text-slate-700 whitespace-nowrap">{PT_MONTHS_SHORT[i]}</td>
+                      <td className="py-2 px-3 text-right font-mono text-emerald-600 font-semibold">{m.rev > 0 ? formatCurrency(m.rev) : <span className="text-slate-200">—</span>}</td>
+                      <td className="py-2 px-3 text-right font-mono text-rose-500 font-semibold">{m.exp > 0 ? formatCurrency(m.exp) : <span className="text-slate-200">—</span>}</td>
+                      <td className={`py-2 px-3 text-right font-mono font-bold ${m.net >= 0 ? "text-indigo-600" : "text-rose-600"}`}>
+                        {m.net !== 0 ? (m.net >= 0 ? "+" : "") + formatCurrency(m.net) : <span className="text-slate-200">—</span>}
+                      </td>
+                      <td className="py-2 px-3 min-w-[100px]">
+                        <div className="flex gap-0.5 h-3 items-end">
+                          <div className="bg-emerald-400 rounded-sm" style={{ width: `${(m.rev / maxVal) * 100}%`, minWidth: m.rev > 0 ? 2 : 0 }} />
+                          <div className="bg-rose-400 rounded-sm" style={{ width: `${(m.exp / maxVal) * 100}%`, minWidth: m.exp > 0 ? 2 : 0 }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50 font-bold">
+                  <td className="py-2.5 px-3 text-[10px] uppercase text-slate-500 font-mono tracking-wider">Total {currentYear}</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-black text-emerald-700">{formatCurrency(annualTotals.rev)}</td>
+                  <td className="py-2.5 px-3 text-right font-mono font-black text-rose-700">{formatCurrency(annualTotals.exp)}</td>
+                  <td className={`py-2.5 px-3 text-right font-mono font-black ${annualTotals.net >= 0 ? "text-indigo-700" : "text-rose-700"}`}>{annualTotals.net >= 0 ? "+" : ""}{formatCurrency(annualTotals.net)}</td>
+                  <td />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {viewMode === "monthly" && (<>
 
       {/* COMPACT INTUITIVE MONTH NAVIGATION BAR */}
       {onSetSelectedMonth && (
@@ -384,6 +468,7 @@ export default function MonthlyReport({ transactions, selectedMonth, onSetSelect
           </div>
         </div>
       </div>
+      </>)}
     </div>
   );
 }

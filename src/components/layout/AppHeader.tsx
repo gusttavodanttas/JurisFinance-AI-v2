@@ -1,5 +1,5 @@
-import React from "react";
-import { Plus, ChevronLeft, ChevronRight, Edit3, Menu, Search } from "lucide-react";
+import React, { useRef } from "react";
+import { Plus, ChevronLeft, ChevronRight, Edit3, Menu, Search, Download, Upload } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
 const PT_MONTHS = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
@@ -10,7 +10,9 @@ export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalet
     handlePrevMonth, handleNextMonth, generatedMonthsList,
     userName, setIsEditProfileOpen, handleLogout,
     setIsModalOpen, setTransactionToEdit, mobileMenuOpen, setMobileMenuOpen,
+    handleExportBackup, handleImportBackup,
   } = useApp();
+  const importRef = useRef<HTMLInputElement>(null);
 
   return (
     <header className="bg-white border-b border-[#e2e8f0] py-2 px-4 sticky top-0 z-30 shadow-xs min-h-[52px] flex items-center">
@@ -113,6 +115,18 @@ export default function AppHeader({ onOpenCommandPalette }: { onOpenCommandPalet
             <Plus className="w-3 h-3" />
             <span className="hidden sm:inline font-sans">Lançar Movimentação</span>
             <span className="sm:hidden font-sans">Lançar</span>
+          </button>
+
+          {/* Backup/Restore */}
+          <input ref={importRef} type="file" accept=".json" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) { handleImportBackup(f); e.target.value = ""; } }} />
+          <button onClick={handleExportBackup} title="Exportar backup JSON"
+            className="p-1.5 rounded-md text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 border border-slate-200 transition-colors cursor-pointer bg-white">
+            <Download className="w-3 h-3" />
+          </button>
+          <button onClick={() => importRef.current?.click()} title="Importar backup JSON"
+            className="p-1.5 rounded-md text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-200 transition-colors cursor-pointer bg-white">
+            <Upload className="w-3 h-3" />
           </button>
 
           <div className="h-4 w-[1px] bg-slate-200 mx-1 hidden sm:block"></div>

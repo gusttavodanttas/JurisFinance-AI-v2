@@ -18,6 +18,10 @@ const ContractGoalsSimModule = lazy(() => import("../ContractGoalsSim").then(m =
 const ForecastComparison = lazy(() => import("../ForecastComparison"));
 const CategoryChartsView = lazy(() => import("../CategoryChartsView"));
 const CloudUsersTab = lazy(() => import("../CloudUsersTab"));
+const ClientsTab = lazy(() => import("../ClientsTab"));
+const CashFlow90DaysTab = lazy(() => import("../CashFlow90DaysTab"));
+const DRETab = lazy(() => import("../DRETab"));
+const CourtCostsTab = lazy(() => import("../CourtCostsTab"));
 
 function TabFallback() {
   return (
@@ -70,7 +74,10 @@ export default function MainContent() {
     handleAddTransactionFromPriority, handleUpdateCurrentMonthBills, handleResetPriorityBills,
     setConfirmModal, officeSub,
     setIsModalOpen, setTransactionToEdit,
-    handleClearLedger,
+    handleClearLedger, monthlyRevenueTarget, setMonthlyRevenueTarget,
+    clients, courtCosts,
+    handleAddClient, handleUpdateClient, handleDeleteClient,
+    handleAddCourtCost, handleUpdateCourtCost, handleDeleteCourtCost,
   } = useApp();
 
   const targetMonth = selectedMonth === "ALL" ? "2026-06" : selectedMonth;
@@ -145,7 +152,7 @@ export default function MainContent() {
 
           {dashboardSubTab === "overview" && (
             <div className="space-y-6 animate-slide-up">
-              <DashboardStats transactions={transactionsWithBills} selectedMonth={selectedMonth} />
+              <DashboardStats transactions={transactionsWithBills} selectedMonth={selectedMonth} monthlyRevenueTarget={monthlyRevenueTarget} onSetMonthlyTarget={setMonthlyRevenueTarget} />
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="xl:col-span-2">
                   <CashFlowChart transactions={transactionsWithBills} priorityBills={priorityBills} />
@@ -310,6 +317,38 @@ export default function MainContent() {
 
         {/* USERS */}
         {activeTab === "users" && <CloudUsersTab />}
+
+        {/* CLIENTS */}
+        {activeTab === "clients" && (
+          <div className="space-y-6">
+            <SectionHeader title="Clientes & Honorários" subtitle="Gerencie clientes e acompanhe o histórico de honorários por cliente" />
+            <ClientsTab clients={clients} transactions={transactions} onAddClient={handleAddClient} onUpdateClient={handleUpdateClient} onDeleteClient={handleDeleteClient} />
+          </div>
+        )}
+
+        {/* CASH FLOW 90 DAYS */}
+        {activeTab === "cashflow90" && (
+          <div className="space-y-6">
+            <SectionHeader title="Fluxo de Caixa — Próximos 90 Dias" subtitle="Projeção semanal com lançamentos previstos e bills em aberto" />
+            <CashFlow90DaysTab transactions={transactions} priorityBills={priorityBills} />
+          </div>
+        )}
+
+        {/* DRE */}
+        {activeTab === "dre" && (
+          <div className="space-y-6">
+            <SectionHeader title="DRE Simplificado" subtitle="Demonstração de resultado anual baseado nos lançamentos realizados" />
+            <DRETab transactions={transactions} />
+          </div>
+        )}
+
+        {/* CUSTAS */}
+        {activeTab === "custas" && (
+          <div className="space-y-6">
+            <SectionHeader title="Custas & Reembolsos Processuais" subtitle="Controle de custas pagas e reembolsos pendentes por cliente/processo" />
+            <CourtCostsTab courtCosts={courtCosts} onAdd={handleAddCourtCost} onUpdate={handleUpdateCourtCost} onDelete={handleDeleteCourtCost} />
+          </div>
+        )}
       </Suspense>
 
       {/* FOOTER */}

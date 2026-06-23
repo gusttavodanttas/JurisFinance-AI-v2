@@ -2,6 +2,7 @@ import React from "react";
 import {
   Scale, LayoutDashboard, Sparkles, FileSpreadsheet, Briefcase,
   Target, FileCheck2, MessageSquare, UserCheck, Edit3,
+  Users, TrendingUp, BarChart3, Gavel,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
 
@@ -78,6 +79,26 @@ export default function Sidebar() {
         {navItem("nav-tab-users", "users",
           <UserCheck className={`w-4 h-4 ${activeTab === "users" ? "scale-110 text-violet-400" : "text-slate-400"}`} />,
           "Usuários Registrados (Nuvem)", "from-purple-950/40 to-slate-900/30", "border-violet-500")}
+
+        <div className="pt-2 pb-1">
+          <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest font-mono px-3.5">Módulos Avançados</p>
+        </div>
+
+        {navItem("nav-tab-clients", "clients",
+          <Users className={`w-4 h-4 ${activeTab === "clients" ? "scale-110 text-sky-400" : "text-slate-400"}`} />,
+          "Clientes & Honorários", "from-sky-950/40 to-slate-900/30", "border-sky-500")}
+
+        {navItem("nav-tab-cashflow90", "cashflow90",
+          <TrendingUp className={`w-4 h-4 ${activeTab === "cashflow90" ? "scale-110 text-teal-400" : "text-slate-400"}`} />,
+          "Fluxo de Caixa 90 Dias", "from-teal-950/40 to-slate-900/30", "border-teal-500")}
+
+        {navItem("nav-tab-dre", "dre",
+          <BarChart3 className={`w-4 h-4 ${activeTab === "dre" ? "scale-110 text-orange-400" : "text-slate-400"}`} />,
+          "DRE Simplificado", "from-orange-950/40 to-slate-900/30", "border-orange-500")}
+
+        {navItem("nav-tab-custas", "custas",
+          <Gavel className={`w-4 h-4 ${activeTab === "custas" ? "scale-110 text-rose-400" : "text-slate-400"}`} />,
+          "Custas & Reembolsos", "from-rose-950/40 to-slate-900/30", "border-rose-500")}
       </nav>
 
       <div className="mt-auto border-t border-slate-800 pt-3 text-[10px] text-slate-500 space-y-2.5">

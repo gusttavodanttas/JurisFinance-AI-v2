@@ -21,6 +21,28 @@ export interface Transaction {
   isAiCategorized?: boolean;
   status?: "PREVISTO" | "REALIZADO";
   reconciled?: boolean;
+  clientName?: string;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  createdAt: string; // YYYY-MM-DD
+}
+
+export interface CourtCost {
+  id: string;
+  date: string; // YYYY-MM-DD
+  description: string;
+  amount: number;
+  processNumber?: string;
+  clientName?: string;
+  reimbursed: boolean;
+  reimbursedDate?: string;
+  notes?: string;
 }
 
 export interface PriorityBill {

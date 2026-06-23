@@ -17,9 +17,11 @@ import { formatCurrency } from "../utils/currency";
 interface DashboardStatsProps {
   transactions: Transaction[];
   selectedMonth: string; // "YYYY-MM" or "ALL"
+  monthlyRevenueTarget?: number;
+  onSetMonthlyTarget?: (v: number) => void;
 }
 
-export default function DashboardStats({ transactions, selectedMonth }: DashboardStatsProps) {
+export default function DashboardStats({ transactions, selectedMonth, monthlyRevenueTarget = 0, onSetMonthlyTarget }: DashboardStatsProps) {
   // Filter transactions for the selected month (both previsto and realized)
   const monthTx = transactions.filter((t) => {
     if (selectedMonth === "ALL") return true;
@@ -373,6 +375,57 @@ export default function DashboardStats({ transactions, selectedMonth }: Dashboar
 
         </div>
       </div>
+
+      {/* MONTHLY REVENUE TARGET */}
+      {(monthlyRevenueTarget > 0 || onSetMonthlyTarget) && (
+        <div className="bg-white rounded-2xl border border-slate-100 p-5 shadow-xs">
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest font-mono">Meta Mensal de Faturamento</p>
+              <h3 className="text-sm font-bold text-slate-900 mt-0.5">
+                {monthlyRevenueTarget > 0
+                  ? `${((monthTx.filter(t => t.type === TransactionType.REVENUE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0) / monthlyRevenueTarget) * 100).toFixed(1)}% da meta atingida`
+                  : "Defina uma meta mensal de receita"}
+              </h3>
+            </div>
+            {onSetMonthlyTarget && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-mono">Meta (R$):</span>
+                <input
+                  type="number"
+                  defaultValue={monthlyRevenueTarget || ""}
+                  placeholder="Ex: 15000"
+                  className="w-28 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-700 focus:outline-none focus:border-indigo-400"
+                  onBlur={e => onSetMonthlyTarget(parseFloat(e.target.value) || 0)}
+                  onKeyDown={e => e.key === "Enter" && onSetMonthlyTarget(parseFloat((e.target as HTMLInputElement).value) || 0)}
+                />
+              </div>
+            )}
+          </div>
+          {monthlyRevenueTarget > 0 && (() => {
+            const realized = monthTx.filter(t => t.type === TransactionType.REVENUE && t.status !== "PREVISTO").reduce((s, t) => s + t.amount, 0);
+            const previsto = monthTx.filter(t => t.type === TransactionType.REVENUE && t.status === "PREVISTO").reduce((s, t) => s + t.amount, 0);
+            const pct = Math.min((realized / monthlyRevenueTarget) * 100, 100);
+            const pctPrev = Math.min(((realized + previsto) / monthlyRevenueTarget) * 100, 100);
+            return (
+              <div className="space-y-2">
+                <div className="relative w-full bg-slate-100 h-5 rounded-full overflow-hidden">
+                  <div className="absolute inset-0 h-full bg-indigo-100 rounded-full" style={{ width: `${pctPrev}%` }} />
+                  <div className="absolute inset-0 h-full bg-indigo-600 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
+                  <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold font-mono text-white drop-shadow">
+                    {formatCurrency(realized)} / {formatCurrency(monthlyRevenueTarget)}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" />Realizado: {formatCurrency(realized)}</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-100 border border-indigo-300 inline-block" />+ Previsto: {formatCurrency(previsto)}</span>
+                  <span>Meta: {formatCurrency(monthlyRevenueTarget)}</span>
+                </div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       {/* Insight Alert Warning Banner (If confusion patrimonio index is relevant) */}
       {mixingIndex > 0 && (

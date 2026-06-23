@@ -76,6 +76,8 @@ export default function TransactionList({
   const [dateTo, setDateTo] = useState<string>("");
   const [csvImportRows, setCsvImportRows] = useState<Omit<Transaction, "id">[]>([]);
   const [showCsvPreview, setShowCsvPreview] = useState(false);
+  const [showUnreconciled, setShowUnreconciled] = useState(false);
+  const [showBalance, setShowBalance] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Get distinct list of available months in transactions, plus some key active months
@@ -148,7 +150,8 @@ export default function TransactionList({
     const matchesDateFrom = !dateFrom || t.date >= dateFrom;
     const matchesDateTo = !dateTo || t.date <= dateTo;
 
-    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo;
+    const matchesReconciled = !showUnreconciled || !t.reconciled;
+    return matchesMonth && matchesScope && matchesType && matchesCategory && matchesSearch && matchesDateFrom && matchesDateTo && matchesReconciled;
   });
 
 
@@ -376,6 +379,21 @@ export default function TransactionList({
             </button>
           )}
           <button
+            onClick={() => setShowUnreconciled(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none ${showUnreconciled ? "bg-teal-600 text-white border-teal-600" : "bg-white hover:bg-teal-50 text-slate-500 hover:text-teal-700 border-slate-200 hover:border-teal-200"}`}
+            title="Mostrar apenas lançamentos não conciliados"
+          >
+            <CheckCheck className="w-3.5 h-3.5" />
+            {showUnreconciled ? "Não conciliados" : "Não conciliado"}
+          </button>
+          <button
+            onClick={() => setShowBalance(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 border text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none ${showBalance ? "bg-indigo-600 text-white border-indigo-600" : "bg-white hover:bg-indigo-50 text-slate-500 hover:text-indigo-700 border-slate-200 hover:border-indigo-200"}`}
+            title="Exibir coluna de saldo acumulado"
+          >
+            Saldo Acum.
+          </button>
+          <button
             onClick={() => exportToCSV(filteredTransactions, `lancamentos-${new Date().toISOString().slice(0,10)}.csv`)}
             disabled={filteredTransactions.length === 0}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-emerald-50 text-slate-500 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 text-[11px] font-semibold rounded-md transition-all cursor-pointer select-none disabled:opacity-40 disabled:cursor-not-allowed"
@@ -420,6 +438,7 @@ export default function TransactionList({
               <th className="py-2.5 px-3 whitespace-nowrap">Escopo / Alocação</th>
               <th className="py-2.5 px-3 min-w-[180px]">Descrição da Conta</th>
               <th className="py-2.5 px-3 text-right whitespace-nowrap">Valor Lançado</th>
+              {showBalance && <th className="py-2.5 px-3 text-right whitespace-nowrap text-indigo-500">Saldo Acum.</th>}
               <th className="py-2.5 px-3 whitespace-nowrap">Categoria</th>
               <th className="py-2.5 px-3 whitespace-nowrap text-center">Método</th>
               <th className="py-2.5 px-3 w-24 text-center">Ações</th>
@@ -450,13 +469,22 @@ export default function TransactionList({
                   </div>
                 </td>
               </tr>
-            ) : (
-              filteredTransactions.map((t) => {
+            ) : (() => {
+              // compute running balance ascending by date
+              const sorted = [...filteredTransactions].sort((a, b) => a.date.localeCompare(b.date));
+              let bal = 0;
+              const balMap = new Map<string, number>();
+              sorted.forEach(t => {
+                if (t.status !== "PREVISTO") bal += t.type === TransactionType.REVENUE ? t.amount : -t.amount;
+                balMap.set(t.id, bal);
+              });
+              return filteredTransactions.map((t) => {
                 const isProf = t.scope === TransactionScope.PROFESSIONAL;
                 const isRevenue = t.type === TransactionType.REVENUE;
 
                 // Detect if the transaction is mixed (e.g. personal expenses leaking into office account)
                 const isPersonalLeak = t.scope === TransactionScope.PERSONAL && t.isAiCategorized;
+                const runBal = balMap.get(t.id) ?? 0;
 
                 return (
                   <tr 
@@ -516,6 +544,16 @@ export default function TransactionList({
                       </span>
                     </td>
 
+                    {/* Running Balance */}
+                    {showBalance && (
+                      <td className="py-2.5 px-3 text-right font-mono text-[11px] whitespace-nowrap">
+                        {t.status === "PREVISTO"
+                          ? <span className="text-slate-300">—</span>
+                          : <span className={runBal >= 0 ? "text-indigo-600 font-semibold" : "text-rose-600 font-semibold"}>{formatCurrency(runBal)}</span>
+                        }
+                      </td>
+                    )}
+
                     {/* Category */}
                     <td className="py-2.5 px-3 whitespace-nowrap text-slate-500 font-medium text-[11px] max-w-[120px] truncate" title={t.category}>
                       {t.category}
@@ -574,8 +612,8 @@ export default function TransactionList({
                     </td>
                   </tr>
                 );
-              })
-            )}
+              });
+            })()}
           </tbody>
         </table>
       </div>

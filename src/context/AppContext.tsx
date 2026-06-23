@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { Transaction, TransactionScope, TransactionType, PriorityBill } from "../types";
+import { Transaction, TransactionScope, TransactionType, PriorityBill, Client, CourtCost } from "../types";
 import { INITIAL_TRANSACTIONS, INITIAL_PRIORITY_BILLS } from "../mockData";
 import { useCloudSync } from "../hooks/useCloudSync";
 
-type ActiveTab = "dashboard" | "ai" | "ledger" | "priorities" | "report" | "whatsapp" | "metas" | "users";
+type ActiveTab = "dashboard" | "ai" | "ledger" | "priorities" | "report" | "whatsapp" | "metas" | "users" | "clients" | "cashflow90" | "dre" | "custas";
 type SyncStatus = "synced" | "syncing" | "error" | "offline";
 type DashboardSubTab = "overview" | "forecast" | "categories";
 
@@ -15,19 +15,18 @@ interface ConfirmModalState {
 }
 
 interface AppContextValue {
-  // Auth
   isAuthenticated: boolean;
   handleLogin: (name?: string, oab?: string) => void;
   handleLogout: () => void;
-
-  // Data
   transactions: Transaction[];
   priorityBills: PriorityBill[];
+  clients: Client[];
+  courtCosts: CourtCost[];
+  monthlyRevenueTarget: number;
+  setMonthlyRevenueTarget: (v: number) => void;
   isLoadingCloud: boolean;
   syncStatus: SyncStatus;
   isDemoMode: boolean;
-
-  // Navigation
   activeTab: ActiveTab;
   setActiveTab: (tab: ActiveTab) => void;
   selectedMonth: string;
@@ -39,8 +38,6 @@ interface AppContextValue {
   setMobileMenuOpen: (open: boolean) => void;
   dashboardSubTab: DashboardSubTab;
   setDashboardSubTab: (tab: DashboardSubTab) => void;
-
-  // Profile
   userName: string;
   userOab: string;
   officeName: string;
@@ -48,27 +45,27 @@ interface AppContextValue {
   isEditProfileOpen: boolean;
   setIsEditProfileOpen: (open: boolean) => void;
   handleSaveProfile: (e: React.FormEvent<HTMLFormElement>) => void;
-
-  // Transaction handlers
   handleAddTransactions: (items: Omit<Transaction, "id">[]) => void;
   handleSaveSingleTransaction: (item: Omit<Transaction, "id">) => void;
   handleUpdateTransaction: (updated: Transaction) => void;
   handleConfirmTransaction: (id: string) => void;
   handleDeleteTransaction: (id: string) => void;
   handleAddTransactionFromPriority: (item: Omit<Transaction, "id">) => void;
-
-  // Priority bill handlers
   handleUpdateCurrentMonthBills: (bills: PriorityBill[], targetMonth: string) => void;
   handleResetPriorityBills: () => void;
-
-  // System
+  handleAddClient: (c: Omit<Client, "id" | "createdAt">) => void;
+  handleUpdateClient: (c: Client) => void;
+  handleDeleteClient: (id: string) => void;
+  handleAddCourtCost: (c: Omit<CourtCost, "id">) => void;
+  handleUpdateCourtCost: (c: CourtCost) => void;
+  handleDeleteCourtCost: (id: string) => void;
+  handleExportBackup: () => void;
+  handleImportBackup: (file: File) => void;
   handleResetData: () => void;
   handleClearAllData: () => void;
   handleClearLedger: () => void;
   confirmModal: ConfirmModalState;
   setConfirmModal: React.Dispatch<React.SetStateAction<ConfirmModalState>>;
-
-  // Modal
   isModalOpen: boolean;
   setIsModalOpen: (open: boolean) => void;
   transactionToEdit: Transaction | null;
@@ -112,9 +109,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [transactions, setTransactions] = useState<Transaction[]>(() => {
     const saved = localStorage.getItem("oab_finance_ledger_v1");
-    if (saved) { try { return JSON.parse(saved); } catch { /* ignore */ } }
-    const demo = localStorage.getItem("oab_demo_mode") === "true";
-    return demo ? INITIAL_TRANSACTIONS : [];
+    if (saved) { try { return JSON.parse(saved); } catch { } }
+    return localStorage.getItem("oab_demo_mode") === "true" ? INITIAL_TRANSACTIONS : [];
   });
 
   const [priorityBills, setPriorityBills] = useState<PriorityBill[]>(() => {
@@ -123,11 +119,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed.map((b: any) => ({ ...b, month: b.month || "2026-06" }));
-      } catch { /* ignore */ }
+      } catch { }
     }
-    const demo = localStorage.getItem("oab_demo_mode") === "true";
-    return demo ? INITIAL_PRIORITY_BILLS.map(b => ({ ...b, month: "2026-06" })) : [];
+    return localStorage.getItem("oab_demo_mode") === "true"
+      ? INITIAL_PRIORITY_BILLS.map(b => ({ ...b, month: "2026-06" }))
+      : [];
   });
+
+  const [clients, setClients] = useState<Client[]>(() => {
+    try { return JSON.parse(localStorage.getItem("oab_clients_v1") || "[]"); } catch { return []; }
+  });
+
+  const [courtCosts, setCourtCosts] = useState<CourtCost[]>(() => {
+    try { return JSON.parse(localStorage.getItem("oab_court_costs_v1") || "[]"); } catch { return []; }
+  });
+
+  const [monthlyRevenueTarget, setMonthlyRevenueTargetState] = useState<number>(() => {
+    return parseFloat(localStorage.getItem("oab_monthly_target") || "0");
+  });
+
+  const setMonthlyRevenueTarget = (v: number) => {
+    setMonthlyRevenueTargetState(v);
+    localStorage.setItem("oab_monthly_target", String(v));
+  };
 
   const [selectedMonth, setSelectedMonth] = useState("2026-06");
   const [activeTab, setActiveTab] = useState<ActiveTab>("priorities");
@@ -141,17 +155,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   });
 
   const { isLoadingCloud, syncStatus } = useCloudSync({
-    isAuthenticated,
-    transactions,
-    priorityBills,
+    isAuthenticated, transactions, priorityBills,
     setTransactions: (fn) => setTransactions(fn),
     setPriorityBills: (fn) => setPriorityBills(fn),
   });
 
-  // Demo mode: auto-populate months with data
+  // Demo mode: auto-populate months
   useEffect(() => {
     if (!isDemoMode || !selectedMonth || selectedMonth === "ALL") return;
-
     setPriorityBills((prev) => {
       if (prev.some(b => b.month === selectedMonth)) return prev;
       const monthHash = selectedMonth.split("-").reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -168,7 +179,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       });
       return [...prev, ...newBills];
     });
-
     setTransactions((prev) => {
       if (prev.some(t => t.date?.substring(0, 7) === selectedMonth)) return prev;
       const monthHash = selectedMonth.split("-").reduce((acc, c) => acc + c.charCodeAt(0), 0);
@@ -189,12 +199,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, [selectedMonth, isDemoMode]);
 
-  // Persist to localStorage
   useEffect(() => { localStorage.setItem("oab_finance_ledger_v1", JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem("oab_priority_bills_v1", JSON.stringify(priorityBills)); }, [priorityBills]);
+  useEffect(() => { localStorage.setItem("oab_clients_v1", JSON.stringify(clients)); }, [clients]);
+  useEffect(() => { localStorage.setItem("oab_court_costs_v1", JSON.stringify(courtCosts)); }, [courtCosts]);
 
   const generatedMonthsList = (() => {
-    const set = new Set<string>(["2026-03", "2026-04", "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]);
+    const set = new Set<string>(["2026-03","2026-04","2026-05","2026-06","2026-07","2026-08","2026-09","2026-10"]);
     transactions.forEach(t => t.date?.length >= 7 && set.add(t.date.substring(0, 7)));
     priorityBills.forEach(b => b.month?.length >= 7 && set.add(b.month));
     return Array.from(set).sort().reverse();
@@ -277,11 +288,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const targetMonth = selectedMonth === "ALL" ? "2026-06" : selectedMonth;
     const [y, m] = targetMonth.split("-");
     const ptMonths = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
-    const readableMonth = `${ptMonths[parseInt(m) - 1]} de ${y}`;
     setConfirmModal({
       isOpen: true,
-      title: `Redefinir Prioridades • ${readableMonth}`,
-      message: `Deseja redefinir a lista de prioridades de despesas do mês ${readableMonth} para as contas padrão?`,
+      title: `Redefinir Prioridades • ${ptMonths[parseInt(m) - 1]} de ${y}`,
+      message: `Deseja redefinir a lista de prioridades de despesas do mês?`,
       onConfirm: () => {
         setPriorityBills(prev => {
           const others = prev.filter(b => b.month !== targetMonth);
@@ -297,11 +307,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  // Client handlers
+  const handleAddClient = (c: Omit<Client, "id" | "createdAt">) => {
+    const newClient: Client = { ...c, id: "cl-" + Math.random().toString(36).substring(2, 10), createdAt: new Date().toISOString().substring(0, 10) };
+    setClients(prev => [newClient, ...prev]);
+  };
+
+  const handleUpdateClient = (c: Client) => setClients(prev => prev.map(x => x.id === c.id ? c : x));
+
+  const handleDeleteClient = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Remover Cliente",
+      message: "Deseja remover este cliente? Os lançamentos vinculados não serão excluídos.",
+      onConfirm: () => setClients(prev => prev.filter(x => x.id !== id)),
+    });
+  };
+
+  // Court cost handlers
+  const handleAddCourtCost = (c: Omit<CourtCost, "id">) => {
+    const newCost: CourtCost = { ...c, id: "cc-" + Math.random().toString(36).substring(2, 10) };
+    setCourtCosts(prev => [newCost, ...prev]);
+  };
+
+  const handleUpdateCourtCost = (c: CourtCost) => setCourtCosts(prev => prev.map(x => x.id === c.id ? c : x));
+
+  const handleDeleteCourtCost = (id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Remover Custa Processual",
+      message: "Deseja remover este registro de custa?",
+      onConfirm: () => setCourtCosts(prev => prev.filter(x => x.id !== id)),
+    });
+  };
+
+  // Backup / Restore
+  const handleExportBackup = () => {
+    const data = { transactions, priorityBills, clients, courtCosts, monthlyRevenueTarget, exportedAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jurisfinance-backup-${new Date().toISOString().substring(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportBackup = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string);
+        setConfirmModal({
+          isOpen: true,
+          title: "Restaurar Backup",
+          message: `Importar backup de ${data.exportedAt ? new Date(data.exportedAt).toLocaleDateString("pt-BR") : "data desconhecida"}? Os dados atuais serão substituídos.`,
+          onConfirm: () => {
+            if (data.transactions) setTransactions(data.transactions);
+            if (data.priorityBills) setPriorityBills(data.priorityBills);
+            if (data.clients) setClients(data.clients);
+            if (data.courtCosts) setCourtCosts(data.courtCosts);
+            if (data.monthlyRevenueTarget) setMonthlyRevenueTargetState(data.monthlyRevenueTarget);
+          },
+        });
+      } catch {
+        alert("Arquivo de backup inválido ou corrompido.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleResetData = () => {
     setConfirmModal({
       isOpen: true,
       title: "Restaurar Dados de Demonstração",
-      message: "⚠️ Deseja ativar o Modo de Demonstração e restaurar a base de dados com lançamentos simulados de teste? Isso substituirá suas transações e faturas atuais.",
+      message: "⚠️ Deseja ativar o Modo de Demonstração? Isso substituirá suas transações atuais.",
       onConfirm: () => {
         setIsDemoMode(true);
         localStorage.setItem("oab_demo_mode", "true");
@@ -316,7 +396,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setConfirmModal({
       isOpen: true,
       title: "Excluir Todos os Lançamentos",
-      message: "⚠️ Atenção! Isso excluirá permanentemente todos os lançamentos do livro caixa. Essa ação não pode ser desfeita e você começará com o saldo zerado. Deseja prosseguir?",
+      message: "⚠️ Isso excluirá permanentemente todos os lançamentos do livro caixa.",
       onConfirm: () => setTransactions([]),
     });
   };
@@ -324,13 +404,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const handleClearAllData = () => {
     setConfirmModal({
       isOpen: true,
-      title: "Limpar Todo o Sistema (Zerar Banco)",
-      message: "⚠️ Atenção! Isso limpará permanentemente todo o Livro Caixa e os Controles de Despesas. Deseja prosseguir?",
+      title: "Limpar Todo o Sistema",
+      message: "⚠️ Isso limpará permanentemente todo o Livro Caixa e os Controles de Despesas.",
       onConfirm: () => {
         setIsDemoMode(false);
         localStorage.setItem("oab_demo_mode", "false");
         setTransactions([]);
         setPriorityBills([]);
+        setClients([]);
+        setCourtCosts([]);
         localStorage.setItem("oab_finance_ledger_v1", JSON.stringify([]));
         localStorage.setItem("oab_priority_bills_v1", JSON.stringify([]));
       },
@@ -340,7 +422,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   return (
     <AppContext.Provider value={{
       isAuthenticated, handleLogin, handleLogout,
-      transactions, priorityBills, isLoadingCloud, syncStatus, isDemoMode,
+      transactions, priorityBills, clients, courtCosts,
+      monthlyRevenueTarget, setMonthlyRevenueTarget,
+      isLoadingCloud, syncStatus, isDemoMode,
       activeTab, setActiveTab, selectedMonth, setSelectedMonth,
       handlePrevMonth, handleNextMonth, generatedMonthsList,
       mobileMenuOpen, setMobileMenuOpen,
@@ -351,6 +435,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       handleUpdateTransaction, handleConfirmTransaction,
       handleDeleteTransaction, handleAddTransactionFromPriority,
       handleUpdateCurrentMonthBills, handleResetPriorityBills,
+      handleAddClient, handleUpdateClient, handleDeleteClient,
+      handleAddCourtCost, handleUpdateCourtCost, handleDeleteCourtCost,
+      handleExportBackup, handleImportBackup,
       handleResetData, handleClearAllData, handleClearLedger,
       confirmModal, setConfirmModal,
       isModalOpen, setIsModalOpen,
